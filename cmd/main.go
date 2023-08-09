@@ -45,7 +45,7 @@ var (
 
 	menuKey = k.KeyF2
 	viewKey = k.KeyF3
-	editKey = k.KeyF4
+	editKey = k.KeyCtrl4
 	copyKey = k.KeyCtrlV
 
 	previewKey = k.KeyCtrlQ
@@ -269,7 +269,7 @@ func main() {
 					number, _ := strconv.Atoi(s)
 
 					if number < 0 || number > len(converter.StorageUnits)-1 {
-						utils.ShowErrAndContinue(errors.New("invalid unix index"))
+						utils.ShowErrAndContinue(errors.New("invalid unit index"))
 						return
 					}
 
@@ -413,8 +413,18 @@ func main() {
 				if nav.HasEntries() {
 					if !nav.GetCurrentEntry().IsDir {
 						terminal.ClearScreen()
+						sizeBefore := nav.GetCurrentEntry().Size
 						task.Edit(nav.GetCurrentEntry().FullPath(), c.Cfg.DefaultEditor)
-						terminal.RenderOutput(&nav, &selected)
+
+						info, _ := os.Stat(nav.GetCurrentEntry().FullPath())
+
+						if info.Size() != int64(sizeBefore) {
+							refresh()
+							terminal.ResetFlushOutput(&nav, &selected)
+						} else {
+							terminal.RenderOutput(&nav, &selected)
+						}
+
 					}
 				}
 
@@ -458,7 +468,7 @@ func main() {
 				if nav.HasEntries() {
 					switch nav.GetCurrentEntry().IsDir {
 					case false:
-						task.ExecuteDefault(nav.GetCurrentEntry().FullPath(), utils.PrintDefaultErrorAndExit)
+						task.ExecuteDefault(nav.GetCurrentEntry().FullPath())
 					default:
 						enterSubfolder(&nav, &selected)
 					}
