@@ -82,8 +82,12 @@ var (
 	selected            navigator.Selected
 	sizeCalculationDone = make(chan struct{})
 	searchDone          = make(chan struct{})
+	deleteChan          = make(chan string)
+	deleteDone          = make(chan bool)
+	moveChan            = make(chan string)
 	stopListener        = make(chan struct{})
 	done                = make(chan bool)
+	copyingdFile        string
 )
 
 func init() {
@@ -189,6 +193,23 @@ func main() {
 		task.StartTicker()
 
 		select {
+
+		case fName := <-moveChan:
+
+			terminal.ClearLine()
+			terminal.CarriageReturn()
+			fmt.Print(terminal.Prompt("Copied " + fName))
+
+		case fName := <-deleteChan:
+
+			terminal.ClearLine()
+			terminal.CarriageReturn()
+			fmt.Print(terminal.Prompt("Deleted " + fName))
+			// time.Sleep(time.Millisecond * 300)
+			// terminal.PrinLoader(stopLoading)
+		case <-deleteDone:
+			refresh()
+
 		case <-sizeCalculationDone:
 			task.StopTicker()
 			cache.Store(nav.GetCurrentPath(), *nav.GetDirSize(), nav.GetEntries())
@@ -478,18 +499,41 @@ func main() {
 				if !selected.IsEmpty() {
 					task.WaitUserInput("Delete selected entries", "y", func(answ string) {
 						if answ == "y" {
+
+							stopProgress := make(chan struct{}, 1)
+							currentFileName := make(chan string)
+
+							go func() {
+								terminal.PrintProgress(stopProgress, currentFileName)
+							}()
+
+							var deleteGroup sync.WaitGroup
+
 							for key := range selected.GetAll() {
-								err := os.RemoveAll(key.FullPath())
-								if err != nil {
-									if errors.Is(err, os.ErrPermission) {
-										utils.ShowErrAndContinue(err)
-										return
-									} else {
-										fmt.Println(err)
-										os.Exit(1)
+
+								deleteGroup.Add(1)
+								go func(en *entry.Entry) {
+									defer func() {
+										deleteGroup.Done()
+										currentFileName <- fmt.Sprint("Deleted ", en.Name, " ")
+									}()
+
+									err := os.RemoveAll(en.FullPath())
+									if err != nil {
+										if errors.Is(err, os.ErrPermission) {
+											utils.ShowErrAndContinue(err)
+											return
+										} else {
+											fmt.Println(err)
+											os.Exit(1)
+										}
 									}
-								}
+								}(key)
+								// time.Sleep(time.Millisecond * 50)
 							}
+							deleteGroup.Wait()
+
+							stopProgress <- struct{}{}
 
 							refresh()
 							terminal.ResetFlushOutput(&nav, &selected)
@@ -520,6 +564,11 @@ func main() {
 				terminal.ResetFlushOutput(&nav, &selected)
 
 			case copyKey, moveKey:
+
+				stopProgress := make(chan struct{}, 1)
+				currentFileName := make(chan string)
+				var w sync.WaitGroup
+				sem := make(chan struct{}, c.Cfg.MaxWorkers)
 
 				if selected.IsEmpty() {
 					continue
@@ -570,6 +619,8 @@ func main() {
 						}
 					}
 
+					//	var moveWg sync.WaitGroup
+
 					mv = func(srcPath, srcName, targetDir string) {
 						srcInfo, err := os.Stat(filepath.Join(srcPath, srcName))
 						if err != nil {
@@ -584,9 +635,6 @@ func main() {
 							if err != nil {
 								if errors.Is(err, os.ErrExist) {
 									task.WaitUserInput(fmt.Sprintf("%s %s %s", "Folder ", srcName, " already exists, do you wish to merge them?"), "y", func(answ string) {
-										// fmt.Println("Answer is:", answ)
-										// time.Sleep(time.Millisecond * 500)
-
 										if answ == "y" || answ == strings.ToLower("YES") {
 											proceed = true
 										} else {
@@ -597,8 +645,7 @@ func main() {
 							}
 
 							if proceed {
-								// fmt.Println("proceediung")
-								// time.Sleep(time.Millisecond * 500)
+
 								dc, err := os.ReadDir(filepath.Join(srcPath, srcName))
 								if err != nil {
 									fmt.Println(err)
@@ -607,33 +654,73 @@ func main() {
 								}
 
 								for _, entry := range dc {
+									// moveWg.Add(1)
+									// go func(srcPat, srcName, targetDir string, entry fs.DirEntry) {
+									// defer func() {
+									// 		moveChan <- filepath.Join(targetDir, srcName)
+									// 		// moveWg.Done()
+									// 	}()
+									// 	mv(filepath.Join(srcPath, srcName), entry.Name(), filepath.Join(targetDir, srcName))
+									// }(srcPath, srcName, targetDir, entry)
+
 									mv(filepath.Join(srcPath, srcName), entry.Name(), filepath.Join(targetDir, srcName))
+
+									// moveChan <- filepath.Join(targetDir, srcName)
+									// terminal.ClearLine()
+									// terminal.CarriageReturn()
+									// fmt.Print(terminal.Prompt("Copied " + filepath.Join(targetDir, srcName)))
 								}
 
 							}
 
-							// if key == moveKey {
-							// 	err := os.RemoveAll(filepath.Join(srcPath, srcName))
-							// 	if err != nil {
-							// 		panic(err)
-							// 	}
-							// }
+							if event.Key == moveKey {
+								err := os.RemoveAll(filepath.Join(srcPath, srcName))
+								if err != nil {
+									panic(err)
+								}
+							}
 
 						} else {
 
 							_, err := os.Stat(filepath.Join(targetDir, srcName))
 
 							if err != nil && errors.Is(err, os.ErrNotExist) {
-								// fmt.Println("File ", srcName, " not exisitng yet")
-								// time.Sleep(time.Millisecond * 500)
-								writeFile(srcPath, srcName, targetDir)
+								w.Add(1)
+								sem <- struct{}{}
+								go func(srcPath, srcName, targetDir string) {
+									defer func() {
+										w.Done()
+										currentFileName <- fmt.Sprint("Written ", filepath.Join(targetDir, srcName), " ")
+										<-sem
+									}()
+
+									writeFile(srcPath, srcName, targetDir)
+								}(srcPath, srcName, targetDir)
+
+								// terminal.ClearLine()
+								// terminal.CarriageReturn()
+								// fmt.Print(terminal.Prompt("Copied " + filepath.Join(targetDir, srcPath)))
 							} else {
-								// fmt.Println("File ", srcName, " already exists")
-								// time.Sleep(time.Millisecond * 500)
 								task.WaitUserInput(fmt.Sprintf("%s %s %s", "File", srcName, " already exists, do you wish to overwrite it?"), "y", func(answ string) {
 									if answ == "y" || answ == strings.ToLower("YES") {
-										os.Remove(filepath.Join(targetDir, srcName))
-										writeFile(srcPath, srcName, targetDir)
+
+										w.Add(1)
+										sem <- struct{}{}
+
+										go func(srcPath, srcName, targetDir string) {
+											defer func() {
+												w.Done()
+												currentFileName <- fmt.Sprint("Written ", filepath.Join(targetDir, srcName), " ")
+												<-sem
+											}()
+
+											os.Remove(filepath.Join(targetDir, srcName))
+											writeFile(srcPath, srcName, targetDir)
+										}(srcPath, srcName, targetDir)
+
+										// terminal.ClearLine()
+										// terminal.CarriageReturn()
+										// fmt.Print(terminal.Prompt("Copied " + filepath.Join(targetDir, srcPath)))
 									}
 								})
 							}
@@ -642,6 +729,11 @@ func main() {
 					}
 
 					if s == "y" {
+
+						go func() {
+							terminal.PrintProgress(stopProgress, currentFileName)
+						}()
+
 						for entry := range selected.GetAll() {
 
 							if *entry.Path == nav.GetCurrentPath() {
@@ -654,12 +746,19 @@ func main() {
 								return
 							}
 
-							mv(*entry.Path, entry.Name, nav.GetCurrentPath())
+							w.Add(1)
+							go func(path string, name string, currentPath string) {
+								defer w.Done()
 
-							refresh()
+								mv(path, name, currentPath)
+							}(*entry.Path, entry.Name, nav.GetCurrentPath())
 
 						}
+						w.Wait()
 
+						stopProgress <- struct{}{}
+						// wg.Wait()
+						refresh()
 						// TODO: after copying sort according to current sorting alghoritm
 					}
 				})
@@ -688,15 +787,5 @@ func main() {
 
 		}
 
-	}
-}
-
-func cleanup() {
-	// Close keyboard, do any other necessary cleanup here
-	terminal.ShowCursor()
-	fmt.Println(terminal.ResetFmt)
-	err := k.Close()
-	if err != nil {
-		fmt.Println("Error closing keyboard:", err)
 	}
 }
