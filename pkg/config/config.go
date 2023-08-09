@@ -1,4 +1,4 @@
-package utils
+package config
 
 import (
 	"encoding/json"
@@ -6,66 +6,87 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/user"
 	"path/filepath"
 
 	"github.com/jbystronski/godirscan/pkg/terminal"
 )
 
-type Palette struct {
-	Main        string `json:"color_1"`
-	Accent      string `json:"color_2"`
-	BgHighlight string `json:"bg_highlight"`
-	BgPrompt    string `json:"bg_prompt"`
-	BgGlobal    string `json:"bg_global"`
-}
-
 type Config struct {
-	CurrentSchema        uint      `json:"set_palette"`
-	DefaultRootDirectory string    `json:"default_root"`
-	SilentMode           bool      `josn:"silent_mode"`
-	DefaultEditor        string    `json:"default_editor"`
-	MaxWorkers           int       `json:"max_concurrent_workers"`
-	ColorSchemas         []Palette `json:"color_schemas"`
+	CurrentSchema        uint             `json:"set_palette"`
+	DefaultRootDirectory string           `json:"default_root"`
+	SilentMode           bool             `josn:"silent_mode"`
+	DefaultEditor        string           `json:"default_editor"`
+	MaxWorkers           int              `json:"max_concurrent_workers"`
+	ColorSchemas         []terminal.Theme `json:"color_schemas"`
 }
 
 var Cfg = &Config{}
 
-var theme Palette
+// var Theme Palette
 
 var defaultConfig = Config{
 	CurrentSchema:        0,
 	SilentMode:           false,
 	DefaultEditor:        "nano",
-	DefaultRootDirectory: terminal.GetUserDirectory(),
+	DefaultRootDirectory: getUserDirectory(),
 	MaxWorkers:           1500,
-	ColorSchemas: []Palette{{
+	ColorSchemas: []terminal.Theme{{
 		Main:        "magenta",
 		Accent:      "bright_cyan",
+		Highlight:   "black",
 		BgHighlight: "bright_white",
+		BgHeader:    "cyan",
+		Header:      "black",
+		Select:      "bright_white",
+		BgSelect:    "magenta",
+		Prompt:      "bright_white",
 		BgPrompt:    "cyan",
-		BgGlobal:    "",
 	}, {
 		Main:        "blue",
-		Accent:      "yellow",
+		Accent:      "bright_yellow",
 		BgHighlight: "bright_white",
+		Highlight:   "black",
+		BgHeader:    "bright_blue",
+		Header:      "bright_white",
+		Select:      "blue",
+		BgSelect:    "bright_yellow",
+		Prompt:      "bright_white",
 		BgPrompt:    "yellow",
-		BgGlobal:    "",
 	}, {
 		Main:        "bright_black",
 		Accent:      "bright_white",
 		BgHighlight: "bright_white",
+		Highlight:   "black",
+		Header:      "black",
+		BgHeader:    "bright_black",
+		Select:      "bright_white",
+		BgSelect:    "bright_black",
+		Prompt:      "bright_white",
 		BgPrompt:    "bright_black",
-		BgGlobal:    "",
 	}, {
 		Main:        "red",
 		Accent:      "bright_yellow",
-		BgHighlight: "white",
-		BgPrompt:    "red",
-		BgGlobal:    "bright_blue",
+		BgSelect:    "bright_yellow",
+		Select:      "black",
+		BgHighlight: "bright_white",
+		Highlight:   "black",
+		Header:      "bright_yellow",
+		BgHeader:    "bright_red",
+		Prompt:      "red",
+		BgPrompt:    "bright_yellow",
 	}},
 }
 
-func ParseColorSchema(num uint) {
+func getUserDirectory() string {
+	currentUser, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
+	return currentUser.HomeDir
+}
+
+func ParseColorSchema(num uint, theme *terminal.Theme) {
 	parse := func(schemaValues []string, themeValues []*string, srcValues map[string]string, defaultValue string) {
 		if len(schemaValues) != len(themeValues) {
 			panic("number of values of a schema must match the number of values of the theme")
@@ -83,9 +104,9 @@ func ParseColorSchema(num uint) {
 
 	s := Cfg.ColorSchemas[num]
 
-	parse([]string{s.Main, s.Accent}, []*string{&theme.Main, &theme.Accent}, terminal.ColorsMap, "white")
+	parse([]string{s.Main, s.Accent, s.Highlight, s.Select, s.Prompt, s.Header}, []*string{&theme.Main, &theme.Accent, &theme.Highlight, &theme.Select, &theme.Prompt, &theme.Header}, terminal.ColorsMap, "white")
 
-	parse([]string{s.BgHighlight, s.BgPrompt, s.BgGlobal}, []*string{&theme.BgHighlight, &theme.BgPrompt, &theme.BgGlobal}, terminal.BackgroundsMap, "white")
+	parse([]string{s.BgHighlight, s.BgHeader, s.BgSelect, s.BgPrompt}, []*string{&theme.BgHighlight, &theme.BgHeader, &theme.BgSelect, &theme.BgPrompt}, terminal.BackgroundsMap, "white")
 }
 
 const (
@@ -157,7 +178,7 @@ func ParseConfigFile(config *Config) {
 	defer configFile.Close()
 
 	decoder := json.NewDecoder(configFile)
-	err := decoder.Decode(&config)
+	err := decoder.Decode(Cfg)
 	if err != nil {
 		if err == io.EOF {
 			fmt.Println("Config file is empty")
@@ -167,7 +188,7 @@ func ParseConfigFile(config *Config) {
 	}
 }
 
-func updateConfigFile(config *Config) {
+func UpdateConfigFile(config *Config) {
 	cfg := findOrCreateConfigFile()
 	err := cfg.Truncate(0)
 	if err != nil {
@@ -177,14 +198,4 @@ func updateConfigFile(config *Config) {
 	defer cfg.Close()
 
 	encodeConfig(cfg, config)
-}
-
-func switchTheme(num uint) {
-	if num < uint(len(Cfg.ColorSchemas)) {
-
-		Cfg.CurrentSchema = num
-
-		ParseColorSchema(num)
-		updateConfigFile(Cfg)
-	}
 }

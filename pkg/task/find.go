@@ -1,4 +1,4 @@
-package utils
+package task
 
 import (
 	"fmt"
@@ -10,28 +10,28 @@ import (
 	"github.com/jbystronski/godirscan/pkg/terminal"
 )
 
-func promptFindByName(defaultPath string, entries []*entry.Entry, done chan<- struct{}) {
+func PromptFindByName(defaultPath string, entries []*entry.Entry, done chan<- struct{}) {
 	var startPath, pattern string
 
-	waitUserInput("Find (in path): ", defaultPath, func(s string) {
+	WaitUserInput("Find (in path): ", defaultPath, func(s string) {
 		startPath = s
-		waitUserInput("Find (pattern): ", "", func(s string) {
+		WaitUserInput("Find (pattern): ", "", func(s string) {
 			pattern = s
 
-			startTicker(&ticker)
+			StartTicker()
 
 			entries = nil
 			terminal.ClearScreen()
 
 			go func() {
-				findByName(startPath, pattern, &entries)
+				FindByName(startPath, pattern, &entries)
 				done <- struct{}{}
 			}()
 		})
 	})
 }
 
-func findByName(root, pattern string, allEntries *[]*entry.Entry) {
+func FindByName(root, pattern string, allEntries *[]*entry.Entry) {
 	var find func(*regexp.Regexp, string)
 
 	find = func(reg *regexp.Regexp, path string) {
@@ -64,7 +64,7 @@ func findByName(root, pattern string, allEntries *[]*entry.Entry) {
 	find(regexp.MustCompile(pattern), filepath.Join(root))
 }
 
-func findBySize(allEntries *[]*entry.Entry, root, pattern string, min, max int64) {
+func FindBySize(allEntries []*entry.Entry, root, pattern string, min, max int64) {
 	var find func(string, *regexp.Regexp, int64, int64)
 
 	find = func(path string, reg *regexp.Regexp, min, max int64) {
@@ -93,7 +93,7 @@ func findBySize(allEntries *[]*entry.Entry, root, pattern string, min, max int64
 								Path:  &path,
 							}
 
-							*allEntries = append(*allEntries, newEntry)
+							allEntries = append(allEntries, newEntry)
 
 						}
 					}

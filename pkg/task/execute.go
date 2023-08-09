@@ -1,4 +1,4 @@
-package utils
+package task
 
 import (
 	"os"
@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func executeDefault(path string, errHandle func(error)) {
+func ExecuteDefault(path string, errHandle func(error)) {
 	var cmd *exec.Cmd
 
 	switch runtime.GOOS {
@@ -34,7 +34,7 @@ func executeDefault(path string, errHandle func(error)) {
 	}
 }
 
-func execCommand(input string, errHandle func(error)) {
+func ExecCommand(input string) {
 	args := strings.Fields(input)
 
 	cmd := exec.Command(args[0], args[1:]...)
@@ -43,6 +43,6 @@ func execCommand(input string, errHandle func(error)) {
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
 	if err != nil {
-		errHandle(err)
+		panic(err)
 	}
 }

@@ -1,23 +1,18 @@
-package utils
+package task
 
 import (
 	"fmt"
-	"time"
+	"os"
+	"strings"
 
 	k "github.com/eiannone/keyboard"
 	"github.com/jbystronski/godirscan/pkg/terminal"
 )
 
-func waitUserInput(prompt, placeholder string, forwardOutput func(string)) {
-	if !k.IsStarted(time.Millisecond * 100) {
-		k.Open()
-
-		defer k.Close()
-	}
-
+func WaitUserInput(prompt, placeholder string, forwardOutput func(string)) {
 	print := func(s string) {
 		terminal.CarriageReturn()
-		fmt.Print(fPrompt(prompt) + " " + s)
+		fmt.Print(terminal.Prompt(prompt) + " " + s)
 	}
 
 	output := placeholder
@@ -27,18 +22,21 @@ func waitUserInput(prompt, placeholder string, forwardOutput func(string)) {
 	for {
 
 		char, key, err := k.GetKey()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 
-		printDefaultErrorAndExit(err)
-
-		if key == quitKey {
+		if key == k.KeyEsc {
 
 			terminal.ClearLine()
 			terminal.CarriageReturn()
-			break
+			return
 
 		} else if key == k.KeyEnter {
 			terminal.ClearLine()
 			terminal.CarriageReturn()
+			output = strings.TrimSpace(output)
 			forwardOutput(output)
 			break
 
