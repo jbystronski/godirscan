@@ -23,8 +23,6 @@ type Config struct {
 
 var Cfg = &Config{}
 
-// var Theme Palette
-
 var defaultConfig = Config{
 	CurrentSchema:        0,
 	SilentMode:           false,
