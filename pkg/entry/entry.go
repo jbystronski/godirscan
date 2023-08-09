@@ -45,6 +45,8 @@ func SetSort(seq *uint8, entries []*Entry) {
 		*seq = SortBySizeAsc(entries)
 	} else if *seq == 2 {
 		*seq = sortBySizeDesc(entries)
+	} else if *seq == 3 {
+		*seq = SortByType(entries)
 	}
 }
 
@@ -53,7 +55,7 @@ func sortBySizeDesc(entries []*Entry) uint8 {
 		return entries[i].Size > entries[j].Size
 	})
 
-	return 0
+	return 3
 }
 
 func SortBySizeAsc(entries []*Entry) uint8 {
@@ -76,6 +78,19 @@ func SortByName(entries []*Entry) uint8 {
 	})
 
 	return 1
+}
+
+func SortByType(entries []*Entry) uint8 {
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].IsDir && !entries[j].IsDir {
+			return true
+		} else if !entries[i].IsDir && entries[j].IsDir {
+			return false
+		} else {
+			return filepath.Ext(entries[i].Name) < filepath.Ext(entries[j].Name)
+		}
+	})
+	return 0
 }
 
 func FormatSize(bytes int) string {
