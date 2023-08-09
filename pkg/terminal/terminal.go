@@ -31,6 +31,7 @@ const (
 	Blink        = "\033[?25h"
 	ClearLineFmt = "\033[2K"
 	ReturnFmt    = "\r"
+	CursorLeft   = "\033[D"
 )
 
 var Segment = strings.Join([]string{Fslash, Texture, Fslash}, "")
@@ -188,6 +189,9 @@ func RenderOutput(n *navigator.Navigator, s *navigator.Selected) {
 		}
 
 	}
+
+	// stop := make(chan struct{})
+
 	// ShowCursor() // Show cursor
 }
 
