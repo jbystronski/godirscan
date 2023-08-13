@@ -10,18 +10,35 @@ import (
 
 func PrintEmpty() {
 	fmt.Printf("%s%s", "folder is empty", ResetFmt)
+	// moveToEndOfLine()
+	// printBorder()
 }
 
 func Prompt(prompt string) string {
 	return fmt.Sprintf("%s%s %s %s", CurrentTheme.BgPrompt, CurrentTheme.Prompt+BoldFmt, prompt, ResetFmt)
 }
 
-func HighlightRow(sep string, en entry.Entry) {
+func highlightRow(sep string, en entry.Entry) {
 	fmt.Printf("%s%s%s%s%s\n", CurrentTheme.BgHighlight, CurrentTheme.Highlight+BoldFmt, sep, en.Name+Space+en.PrintSize(), ResetFmt)
+	// moveToEndOfLine()
+	// printBorder()
 }
 
 func MarkRow(sep string, en entry.Entry) {
 	fmt.Printf("%s%s%s%s%s\n", CurrentTheme.BgSelect, CurrentTheme.Select+BoldFmt, sep, en.Name+Space+en.PrintSize(), ResetFmt)
+	// printRightBorder()
+	// moveToEndOfLine()
+	// printBorder()
+}
+
+func printRow(sep string, entry entry.Entry) {
+	if entry.IsDir {
+		fmt.Printf("%s%s%s\n", strings.Join([]string{ColorsMap["bright_white"], BoldFmt, sep, CurrentTheme.Main, entry.Name, ColorsMap["bright_white"], Space}, ""), entry.PrintSize(), ResetFmt)
+	} else {
+		fmt.Printf("%s%s%s\n", strings.Join([]string{ColorsMap["bright_white"], sep, CurrentTheme.Accent, entry.Name, BoldFmt, ColorsMap["bright_white"], Space}, ""), entry.PrintSize(), ResetFmt)
+	}
+
+	// printRightBorder()
 }
 
 func r(s string, times int) string {
@@ -50,16 +67,8 @@ func PrintBanner() {
 	fmt.Print("\n\n")
 }
 
-func PrintRow(sep string, entry entry.Entry) {
-	if entry.IsDir {
-		fmt.Printf("%s%s%s\n", strings.Join([]string{ColorsMap["bright_white"], BoldFmt, sep, CurrentTheme.Main, entry.Name, ColorsMap["bright_white"], Space}, ""), entry.PrintSize(), ResetFmt)
-	} else {
-		fmt.Printf("%s%s%s\n", strings.Join([]string{ColorsMap["bright_white"], sep, CurrentTheme.Accent, entry.Name, BoldFmt, ColorsMap["bright_white"], Space}, ""), entry.PrintSize(), ResetFmt)
-	}
-}
-
-func PrintHeader(header string) {
-	fmt.Printf("%s%s\n", CurrentTheme.BgHeader+CurrentTheme.Header+" F2 - options "+Space+header, ResetFmt)
+func printHeader(header string) {
+	fmt.Printf("%s%s", CurrentTheme.BgHeader+CurrentTheme.Header+" F2 - options "+Space+header, ResetFmt)
 }
 
 // func printOptions(options []Option) {

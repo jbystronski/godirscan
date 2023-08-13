@@ -7,9 +7,12 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
+	"unicode/utf8"
 
 	"github.com/jbystronski/godirscan/pkg/entry"
 	"github.com/jbystronski/godirscan/pkg/navigator"
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -32,6 +35,19 @@ const (
 	ClearLineFmt = "\033[2K"
 	ReturnFmt    = "\r"
 	CursorLeft   = "\033[D"
+	cursorRight  = "\033[C"
+	// borderHorizontal        = "\u2550"
+	// borderVertical          = "\u2551"
+	// topLeftBorderCorner     = "\u2554"
+	// topRightBorderCorner    = "\u2557"
+	// bottomLeftBorderCorner  = "\u255A"
+	// bottomRightBorderCorner = "\u255D"
+	borderHorizontal        = "\u2501"
+	borderVertical          = "\u2503"
+	topLeftBorderCorner     = "\u250F"
+	topRightBorderCorner    = "\u2513"
+	bottomLeftBorderCorner  = "\u2517"
+	bottomRightBorderCorner = "\u251B"
 )
 
 var Segment = strings.Join([]string{Fslash, Texture, Fslash}, "")
@@ -77,6 +93,21 @@ var Segment = strings.Join([]string{Fslash, Texture, Fslash}, "")
 // bSlash      = "\u2572"
 //
 // texture     = "\u2591"
+
+func moveToEndOfLine() {
+	fmt.Print("\033[K")
+}
+
+func Cell(rowNumber, colNumber int) {
+	fmt.Printf("\033[%d;%dH", rowNumber, colNumber)
+}
+
+func trimLine(line *string, max int) {
+	if len(*line) > max {
+		*line = (*line)[:max-3]
+		*line += *line + "..."
+	}
+}
 
 func ClearScreen() {
 	clearCommand := ""
@@ -126,7 +157,6 @@ func terminalSize() (int, int, error) {
 			cmd = exec.Command("stty", "size")
 		}
 	}
-
 	cmd.Stdin = os.Stdin
 	out, err := cmd.Output()
 	if err != nil {
@@ -134,16 +164,33 @@ func terminalSize() (int, int, error) {
 	}
 
 	st := string(out)
-	split := strings.Split(st, " ")
 
-	rows, _ := strconv.Atoi(split[0])
-	cols, _ := strconv.Atoi(split[1])
+	rows, cols := 0, 0
+
+	switch runtime.GOOS {
+	case "windows":
+		// Parse rows and columns from the output of 'mode' command on Windows
+		rows, _ = strconv.Atoi(strings.Split(st, "\n")[2][8:])
+		cols, _ = strconv.Atoi(strings.Split(st, "\n")[3][9:])
+	default:
+		// Parse rows and columns from the output of 'stty size' command on Unix-like systems
+		split := strings.Fields(st)
+		if len(split) >= 2 {
+			rows, _ = strconv.Atoi(split[0])
+			cols, _ = strconv.Atoi(split[1])
+		}
+	}
 
 	return rows, cols, nil
 }
 
 func MoveCursorTop() {
 	fmt.Print(CursorTop)
+}
+
+func clearCells(row, col, length int) {
+	Cell(row, col)
+	fmt.Print(strings.Repeat(Space, length))
 }
 
 func ClearLine() {
@@ -154,58 +201,127 @@ func CarriageReturn() {
 	fmt.Printf(ReturnFmt)
 }
 
+func FlushOutput(n *navigator.Navigator, s *navigator.Selected) {
+	//	ClearScreen()
+	RenderOutput(n, s)
+}
+
+func ResetFlushOutput(n *navigator.Navigator, s *navigator.Selected) {
+	// ClearScreen()
+	Cell(1, 1)
+	printHeader(n.CurrentPath + Space + entry.PrintSizeAsString(*n.GetDirSize()))
+
+	//	ClearScreen()
+	n.Reset()
+	RenderOutput(n, s)
+}
+
 func RenderOutput(n *navigator.Navigator, s *navigator.Selected) {
-	MoveCursorTop()
-	n.NumVisibleLines = GetNumVisibleLines() - 2
-
-	n.SetEndLine(n.GetStartLine() + n.NumVisibleLines)
-
-	if n.GetEndline() > n.GetEntriesLength() {
-		n.SetEndLine(n.GetEntriesLength())
-	}
-
-	var sep string
+	// Cell(1, 1)
+	// printHeader(n.CurrentPath + Space + entry.PrintSizeAsString(*n.GetDirSize()))
+	// MoveCursorTop()
+	Cell(1, 1)
 	ClearLine()
-
-	PrintHeader(n.GetCurrentPath() + Space + entry.PrintSizeAsString(*n.GetDirSize()))
-
-	if !n.HasEntries() {
-		PrintEmpty()
-	}
-	for i := n.GetStartLine(); i < n.GetEndline(); i++ {
-
-		if i == n.GetEntriesLength()-1 {
+	// clearCells(1, 1, getPaneWidth())
+	printHeader(n.CurrentPath + Space + entry.PrintSizeAsString(*n.GetDirSize()))
+	visibleLines := 20
+	Cell(3, 2)
+	var sep string
+	for i := 0; i <= visibleLines; i++ {
+		if i == n.GetEntriesLength() {
 			sep = CornerLine + Hseparator
 		} else {
 			sep = TeeLine + Hseparator
 		}
-		ClearLine()
-		if n.GetCurrentIndex() == i {
-			HighlightRow(sep, *n.GetEntry(i))
+
+		if n.CurrentIndex == i {
+			highlightRow(sep, *n.GetEntry(i))
 		} else if _, ok := s.SelectedEntries[n.GetEntry(i)]; ok {
 			MarkRow(sep, *n.GetEntry(i))
 		} else {
-			PrintRow(sep, *n.GetEntry(i))
+			printRow(sep, *n.GetEntry(i))
 		}
 
 	}
+	Cell(GetNumVisibleLines(), 1)
+	// MoveCursorTop()
+	// n.NumVisibleLines = GetNumVisibleLines() - reserverdRows
 
-	// stop := make(chan struct{})
+	// n.SetEndLine(n.GetStartLine() + n.NumVisibleLines)
 
-	// ShowCursor() // Show cursor
-}
+	// PrintHeader(n.CurrentPath + Space + entry.PrintSizeAsString(*n.GetDirSize()))
+	// printTopBorder()
 
-func FlushOutput(n *navigator.Navigator, s *navigator.Selected) {
-	ClearScreen()
-	RenderOutput(n, s)
+	// if n.EndLine > n.GetEntriesLength() {
+	// 	n.SetEndLine(n.GetEntriesLength())
+	// }
+
+	// var sep string
+	// ClearLine()
+
+	// if !n.HasEntries() {
+	// 	PrintEmpty()
+	// }
+	// for i := n.StartLine; i < n.EndLine; i++ {
+
+	// 	if i == n.GetEntriesLength()-1 {
+	// 		sep = CornerLine + Hseparator
+	// 	} else {
+	// 		sep = TeeLine + Hseparator
+	// 	}
+	// 	ClearLine()
+	// 	if n.CurrentIndex == i {
+	// 		HighlightRow(sep, *n.GetEntry(i))
+	// 	} else if _, ok := s.SelectedEntries[n.GetEntry(i)]; ok {
+	// 		MarkRow(sep, *n.GetEntry(i))
+	// 	} else {
+	// 		PrintRow(sep, *n.GetEntry(i))
+	// 	}
+
+	// }
 }
 
 func ShowCursor() {
 	fmt.Println(Blink)
 }
 
-func ResetFlushOutput(n *navigator.Navigator, s *navigator.Selected) {
-	ClearScreen()
-	n.Reset()
-	RenderOutput(n, s)
+func MoveCursorLeft(times int) {
+	fmt.Print(strings.Repeat(CursorLeft, times))
+}
+
+func MoveCursorRight(times int) {
+	fmt.Print(strings.Repeat(cursorRight, times))
+}
+
+func RuneToUtf8String(r rune) string {
+	if r < utf8.RuneSelf && r >= 0 {
+		return string(r)
+	}
+
+	norms := []norm.Form{norm.NFC, norm.NFKC, norm.NFD, norm.NFKD}
+
+	var normalized string
+
+	for _, form := range norms {
+		normalized = form.String(string(r))
+		fmt.Printf(" %v (%v bytes)\n", normalized, len(normalized))
+		time.Sleep(time.Second * 1)
+		if len(normalized) == 1 {
+			return normalized
+		}
+	}
+
+	return string(r)
+
+	// normalized := norm.NFKC.String(string(r))
+
+	// displayWidth := utf8.RuneCountInString(normalized)
+
+	// if displayWidth > 1 {
+
+	// 	truncated := normalized[:utf8.RuneLen([]rune(normalized)[0])]
+	// 	return truncated
+	// }
+
+	// return normalized
 }

@@ -9,22 +9,22 @@ import (
 )
 
 type Navigator struct {
-	NumVisibleLines, dirSize, currentIndex int
-	startLine, endLine                     *int
+	NumVisibleLines, DirSize, CurrentIndex int
+	StartLine, EndLine                     int
 
 	SortMode              uint8
-	entries               []*entry.Entry
+	Entries               []*entry.Entry
 	backTrace             []int
-	currentPath, rootPath string
+	CurrentPath, RootPath string
 }
 
 func NewNavigator() *Navigator {
-	startLine := 0
-	endLine := 0
+	// StartLine := 0
+	// EndLine := 0
 
 	return &Navigator{
-		startLine: &startLine,
-		endLine:   &endLine,
+		// StartLine: &StartLine,
+		// EndLine:   &EndLine,
 		// NumVisibleLines: terminal.GetNumVisibleLines(),
 	}
 }
@@ -50,72 +50,64 @@ func (n *Navigator) HasEntries() bool {
 	return n.GetEntriesLength() > 0
 }
 
-func (n *Navigator) GetEndline() int {
-	return *n.endLine
+func (n *Navigator) GetEndLine() int {
+	return n.EndLine
 }
 
 func (n *Navigator) GetCurrentIndex() int {
-	return n.currentIndex
+	return n.CurrentIndex
 }
 
 func (n *Navigator) SetCurrentIndex(i int) {
-	n.currentIndex = i
+	n.CurrentIndex = i
 }
 
 func (n *Navigator) SetEndLine(i int) {
-	*n.endLine = i
+	n.EndLine = i
 }
 
 func (n *Navigator) GetStartLine() int {
-	return *n.startLine
+	return n.StartLine
 }
 
 func (n *Navigator) SetStartLine(i int) {
-	*n.startLine = i
+	n.StartLine = i
 }
 
 func (n *Navigator) GetDirSize() *int {
-	return &n.dirSize
+	return &n.DirSize
 }
 
 func (n *Navigator) SetDirSize(num int) {
-	n.dirSize = num
-}
-
-func (n *Navigator) GetCurrentPath() string {
-	return n.currentPath
-}
-
-func (n *Navigator) GetRootPath() string {
-	return n.rootPath
+	n.DirSize = num
 }
 
 func (n *Navigator) SetCurrentPath(p string) {
-	n.currentPath = p
+	n.CurrentPath = p
 }
 
 func (n *Navigator) GetEntries() []*entry.Entry {
-	return n.entries
+	return n.Entries
 }
 
 func (n *Navigator) SetEntries(newEntries []*entry.Entry) {
-	n.entries = newEntries
+	n.Entries = newEntries
 }
 
 func (n *Navigator) SetRootPath(p string) {
-	n.rootPath = p
+	n.RootPath = p
 }
 
 func (n *Navigator) GetEntriesLength() int {
-	return len(n.entries)
+	return len(n.Entries)
 }
 
 func (n *Navigator) GetCurrentEntry() *entry.Entry {
-	return n.entries[n.currentIndex]
+	return n.Entries[n.CurrentIndex]
 }
 
 func (n *Navigator) GetEntry(index int) *entry.Entry {
-	return n.entries[index]
+	return n.Entries[index]
 }
 
 func (n *Navigator) Reset() {
@@ -125,10 +117,10 @@ func (n *Navigator) Reset() {
 }
 
 func (n *Navigator) MoveDown() (ok bool) {
-	if n.GetEntriesLength() > 0 && n.currentIndex < n.GetEntriesLength()-1 {
-		n.currentIndex++
-		if n.currentIndex >= *n.startLine+n.NumVisibleLines {
-			*n.startLine++
+	if n.GetEntriesLength() > 0 && n.CurrentIndex < n.GetEntriesLength()-1 {
+		n.CurrentIndex++
+		if n.CurrentIndex >= n.StartLine+n.NumVisibleLines {
+			n.StartLine++
 		}
 		ok = true
 
@@ -137,10 +129,10 @@ func (n *Navigator) MoveDown() (ok bool) {
 }
 
 func (n *Navigator) MoveUp() (ok bool) {
-	if n.HasEntries() && n.currentIndex > 0 {
-		n.currentIndex--
-		if n.currentIndex < *n.startLine {
-			*n.startLine--
+	if n.HasEntries() && n.CurrentIndex > 0 {
+		n.CurrentIndex--
+		if n.CurrentIndex < n.StartLine {
+			n.StartLine--
 		}
 
 		ok = true
@@ -149,11 +141,11 @@ func (n *Navigator) MoveUp() (ok bool) {
 }
 
 func (n *Navigator) ClearEntries() {
-	n.entries = nil
+	n.Entries = nil
 }
 
 func (n *Navigator) GetParentPath() string {
-	parentDir, _ := filepath.Split(n.currentPath)
+	parentDir, _ := filepath.Split(n.CurrentPath)
 
 	if parentDir == string(os.PathSeparator) {
 		return parentDir
@@ -163,7 +155,7 @@ func (n *Navigator) GetParentPath() string {
 }
 
 func (n *Navigator) IncrementIndex() {
-	if n.currentIndex < n.GetEntriesLength()-1 {
-		n.currentIndex++
+	if n.CurrentIndex < n.GetEntriesLength()-1 {
+		n.CurrentIndex++
 	}
 }

@@ -38,26 +38,26 @@ func resolveUserDirectory(fPath *string) {
 }
 
 func ScanInputDirectory(defaultDir string) (rootDir string, entries []*entry.Entry) {
-	WaitUserInput("Scan directory: ", defaultDir, func(fPath string) {
-		resolveUserDirectory(&fPath)
+	fPath := WaitInput("Scan directory: ", defaultDir)
 
-		_, err := os.Stat(fPath)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+	resolveUserDirectory(&fPath)
 
-		}
+	_, err := os.Stat(fPath)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 
-		rootPath := filepath.VolumeName("") + string(os.PathSeparator)
+	}
 
-		if fPath == rootPath {
-			fPath = rootPath
-		} else {
-			fPath = strings.TrimSuffix(fPath, string(os.PathSeparator))
-		}
+	rootPath := filepath.VolumeName("") + string(os.PathSeparator)
 
-		rootDir, entries = ScanDirectory(fPath)
-	})
+	if fPath == rootPath {
+		fPath = rootPath
+	} else {
+		fPath = strings.TrimSuffix(fPath, string(os.PathSeparator))
+	}
+
+	rootDir, entries = ScanDirectory(fPath)
 
 	return
 }

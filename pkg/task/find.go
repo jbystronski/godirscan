@@ -11,27 +11,22 @@ import (
 )
 
 func PromptFindByName(defaultPath string, entries []*entry.Entry, done chan<- struct{}) {
-	var startPath, pattern string
+	startPath := WaitInput("Find (in path): ", defaultPath)
 
-	WaitUserInput("Find (in path): ", defaultPath, func(s string) {
-		startPath = s
-		WaitUserInput("Find (pattern): ", "", func(s string) {
-			pattern = s
+	pattern := WaitInput("Find (pattern): ", "")
 
-			StartTicker()
+	StartTicker()
 
-			entries = nil
-			terminal.ClearScreen()
+	entries = nil
+	terminal.ClearScreen()
 
-			go func() {
-				FindByName(startPath, pattern, &entries)
-				done <- struct{}{}
-			}()
-		})
-	})
+	go func() {
+		findByName(startPath, pattern, &entries)
+		done <- struct{}{}
+	}()
 }
 
-func FindByName(root, pattern string, allEntries *[]*entry.Entry) {
+func findByName(root, pattern string, allEntries *[]*entry.Entry) {
 	var find func(*regexp.Regexp, string)
 
 	find = func(reg *regexp.Regexp, path string) {
@@ -64,7 +59,70 @@ func FindByName(root, pattern string, allEntries *[]*entry.Entry) {
 	find(regexp.MustCompile(pattern), filepath.Join(root))
 }
 
-func FindBySize(allEntries []*entry.Entry, root, pattern string, min, max int64) {
+// func PromptFindBySize() {
+// 	var pathName string
+// 	var unitAsInt int
+// 	var max float64 = 0, math.MaxFloat64
+
+// 	unitAsString := WaitInput("Find by size, unit: ( 0=bytes 1=kb 2=mb 3=gb ) ", "2")
+
+// 	unit, _ := strconv.Atoi(unitAsString)
+
+// 	if number < 0 || number > len(converter.StorageUnits)-1 {
+// 		utils.ShowErrAndContinue(errors.New("invalid unit index"))
+// 		return
+// 	}
+
+// 	unitAsString = converter.StorageUnits[number]
+// 	unitAsInt = number
+
+// 	min := task.WaitInput(fmt.Sprintf("%s %s", "Type min value in", unitAsString), "0")
+
+// 	num, err := strconv.ParseFloat(s, 64)
+// 	if err != nil {
+// 		utils.ShowErrAndContinue(err)
+// 		return
+// 	}
+
+// 	if num < 0 {
+// 		num = 0
+// 	}
+// 	min = num
+
+// 	max = task.WaitInput(fmt.Sprintf("%s %s", "Type max value ( 0 or no value means unlimited ) in", unitAsString), "")
+// 	if max != "" || max != "0" {
+// 		n, err := strconv.ParseFloat(max, 64)
+// 		if err != nil {
+// 			utils.ShowErrAndContinue(err)
+// 			return
+// 		}
+// 		max = n
+
+// 	}
+
+// 	if max < min {
+// 		utils.ShowErrAndContinue(fmt.Errorf("max value: %v, can't be lower than min value: %v", max, min))
+// 		return
+// 	}
+
+// 	dir := task.WaitInput("Root directory to search from: ", "")
+// 	_, err = os.Stat(dir)
+// 	if err != nil {
+// 		utils.ShowErrAndContinue(err)
+// 		return
+// 	}
+
+// 	pattern := task.WaitInput("Pattern to match: ", "")
+
+// 	minV, maxV := converter.ToBytes(converter.StorageUnits[unitAsInt], min, max)
+
+// 	task.StartTicker()
+
+// 	nav.ClearEntries()
+// 	terminal.ClearScreen()
+// }
+
+func findBySize(allEntries []*entry.Entry, root, pattern string, min, max int64) {
 	var find func(string, *regexp.Regexp, int64, int64)
 
 	find = func(path string, reg *regexp.Regexp, min, max int64) {

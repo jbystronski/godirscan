@@ -2,13 +2,15 @@ package task
 
 import "time"
 
-var Ticker time.Ticker
+var Ticker *time.Ticker
 
 func StopTicker() {
-	Ticker.Stop()
+	if Ticker != nil {
+		Ticker.Stop()
+	}
 }
 
 func StartTicker() {
-	Ticker.Stop()
-	Ticker = *time.NewTicker(time.Millisecond * 100)
+	StopTicker()
+	Ticker = time.NewTicker(time.Millisecond * 400)
 }

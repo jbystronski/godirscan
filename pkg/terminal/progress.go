@@ -10,8 +10,6 @@ func PrintProgress(stop <-chan struct{}, msg <-chan string) {
 	//	stages := [...]string{"|", Fslash, Hseparator, Bslash}
 	stages := [...]string{".   ", "..  ", "... ", "...."}
 
-	// testNames := []string{"some file", "translations.pdf", "windowsKey29.zip", "codeV1.2xsafdas.deb"}
-
 	var currentMsg string
 
 	var currStage uint8
@@ -23,14 +21,9 @@ func PrintProgress(stop <-chan struct{}, msg <-chan string) {
 		case <-stop:
 			showProgress = false
 			return
-		// case <-time.After(time.Second * 5):
-		// 	showProgress = false
-		// 	return
 
 		case receivedMsg := <-msg:
 
-			// fmt.Println(receivedMsg)
-			// time.Sleep(time.Millisecond * 100)
 			currentMsg = receivedMsg
 
 		default:
@@ -42,8 +35,6 @@ func PrintProgress(stop <-chan struct{}, msg <-chan string) {
 				currStage++
 			}
 
-			// fmt.Print(len(output) - 1)
-			// time.Sleep(time.Second * 2)
 			ClearLine()
 			CarriageReturn()
 			fmt.Print(output)

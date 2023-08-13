@@ -1,26 +1,21 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"io"
-	"math"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	k "github.com/eiannone/keyboard"
 	"github.com/jbystronski/godirscan/pkg/cache"
 	"github.com/jbystronski/godirscan/pkg/config"
 	c "github.com/jbystronski/godirscan/pkg/config"
-	"github.com/jbystronski/godirscan/pkg/converter"
 	"github.com/jbystronski/godirscan/pkg/entry"
 	"github.com/jbystronski/godirscan/pkg/navigator"
 	"github.com/jbystronski/godirscan/pkg/task"
 	"github.com/jbystronski/godirscan/pkg/terminal"
-
 	"github.com/jbystronski/godirscan/pkg/utils"
 )
 
@@ -77,17 +72,18 @@ var (
 )
 
 var (
-	nav navigator.Navigator
+	nav                  navigator.Navigator
+	selected             navigator.Selected
+	wg                   sync.WaitGroup
+	sizeCalculationDone  = make(chan struct{})
+	searchDone           = make(chan struct{})
+	pauseNavigation      = make(chan struct{}, 1)
+	stopNavigation       = make(chan struct{}, 1)
+	resumeNavigationChan = make(chan struct{}, 1)
+	taskDone             = make(chan func())
+	exit                 = make(chan bool, 1)
 
-	selected            navigator.Selected
-	sizeCalculationDone = make(chan struct{})
-	searchDone          = make(chan struct{})
-	deleteChan          = make(chan string)
-	deleteDone          = make(chan bool)
-	moveChan            = make(chan string)
-	stopListener        = make(chan struct{})
-	done                = make(chan bool)
-	copyingdFile        string
+	done = make(chan bool)
 )
 
 func init() {
@@ -103,25 +99,25 @@ func enterSubfolder(nav *navigator.Navigator, selected *navigator.Selected) {
 		p := nav.GetCurrentEntry().FullPath()
 
 		if cachedEntries, ok := cache.Get(p); ok {
-			nav.SetEntries(cachedEntries.Entries)
-			nav.SetDirSize(cachedEntries.Size)
-			nav.SetCurrentPath(p)
-			nav.AddBackTrace(nav.GetCurrentIndex())
+			nav.Entries = cachedEntries.Entries
+			nav.DirSize = cachedEntries.Size
+			nav.CurrentPath = p
+			nav.AddBackTrace(nav.CurrentIndex)
 			terminal.ResetFlushOutput(nav, selected)
 		} else {
 			task.StartTicker()
 			newPath, newEntries := task.ScanDirectory(p)
 
-			nav.SetCurrentPath(newPath)
-			nav.SetEntries(newEntries)
+			nav.CurrentPath = newPath
+			nav.Entries = newEntries
 			nav.SortMode = 0
 
-			entry.SetSort(&nav.SortMode, nav.GetEntries())
-			nav.AddBackTrace(nav.GetCurrentIndex())
+			entry.SetSort(&nav.SortMode, nav.Entries)
+			nav.AddBackTrace(nav.CurrentIndex)
 			terminal.ResetFlushOutput(nav, selected)
 
 			go func() {
-				task.ScanDirectorySize(nav.GetEntries(), nav.GetDirSize())
+				task.ScanDirectorySize(nav.Entries, &nav.DirSize)
 				sizeCalculationDone <- struct{}{}
 			}()
 
@@ -136,42 +132,36 @@ func scan(n *navigator.Navigator, s *navigator.Selected) {
 	if newRootDir != "" {
 		s.Clear()
 		cache.Clear()
-		n.SetCurrentPath(newRootDir)
-		n.SetRootPath(newRootDir)
-		n.SetEntries(newEntries)
-		entry.SetSort(&nav.SortMode, nav.GetEntries())
+		n.CurrentPath = newRootDir
+		n.RootPath = newRootDir
+		n.Entries = newEntries
+		entry.SetSort(&nav.SortMode, nav.Entries)
 
 		terminal.ResetFlushOutput(n, s)
 		task.StartTicker()
 		go func() {
-			task.ScanDirectorySize(n.GetEntries(), n.GetDirSize())
+			task.ScanDirectorySize(n.Entries, &n.DirSize)
 
 			sizeCalculationDone <- struct{}{}
 		}()
 	}
 }
 
-var wg sync.WaitGroup
+func refresh(nav *navigator.Navigator, selected *navigator.Selected) {
+	selected.Clear()
+	cache.Clear()
+	task.StartTicker()
+	nav.CurrentPath, nav.Entries = task.ScanDirectory(nav.CurrentPath)
+
+	go func() {
+		task.ScanDirectorySize(nav.Entries, &nav.DirSize)
+		sizeCalculationDone <- struct{}{}
+	}()
+}
 
 var keyListener = true
 
-func main() {
-	terminal.ClearScreen()
-
-	refresh := func() {
-		selected.Clear()
-		cache.Clear()
-		task.StartTicker()
-		newPath, newEntries := task.ScanDirectory(nav.GetCurrentPath())
-		nav.SetCurrentPath(newPath)
-		nav.SetEntries(newEntries)
-
-		go func() {
-			task.ScanDirectorySize(nav.GetEntries(), nav.GetDirSize())
-			sizeCalculationDone <- struct{}{}
-		}()
-	}
-
+func navigate() {
 	keysEvents, err := k.GetKeys(1)
 	if err != nil {
 		panic(err)
@@ -185,36 +175,24 @@ func main() {
 		}
 	}()
 
-	terminal.PrintBanner()
-	scan(&nav, &selected)
-
 	for keyListener {
-
-		task.StartTicker()
+		//	task.StartTicker()
 
 		select {
-
-		case fName := <-moveChan:
-
-			terminal.ClearLine()
-			terminal.CarriageReturn()
-			fmt.Print(terminal.Prompt("Copied " + fName))
-
-		case fName := <-deleteChan:
-
-			terminal.ClearLine()
-			terminal.CarriageReturn()
-			fmt.Print(terminal.Prompt("Deleted " + fName))
-			// time.Sleep(time.Millisecond * 300)
-			// terminal.PrinLoader(stopLoading)
-		case <-deleteDone:
-			refresh()
-
+		case <-pauseNavigation:
+			keyListener = false
+			break
+		case <-stopNavigation:
+			keyListener = false
+			exit <- true
+			break
 		case <-sizeCalculationDone:
+
 			task.StopTicker()
-			cache.Store(nav.GetCurrentPath(), *nav.GetDirSize(), nav.GetEntries())
+			cache.Store(nav.CurrentPath, *&nav.DirSize, nav.Entries)
 			terminal.RenderOutput(&nav, &selected)
 		case <-task.Ticker.C:
+
 			terminal.RenderOutput(&nav, &selected)
 		case <-searchDone:
 			if nav.GetEntriesLength() == 0 {
@@ -224,13 +202,40 @@ func main() {
 		case event := <-keysEvents:
 			switch event.Key {
 			case menuKey:
-				terminal.ClearScreen()
-				terminal.PrintHelp()
-				terminal.ResetFlushOutput(&nav, &selected)
+
+				go func() {
+					terminal.ClearScreen()
+					terminal.PrintHelp()
+
+					resumeNavigation()
+					terminal.ResetFlushOutput(&nav, &selected)
+				}()
+				pauseNavigation <- struct{}{}
+
 			case k.KeyCtrlC:
 				return
 			case scanKey:
-				scan(&nav, &selected)
+				go func() {
+					scan(&nav, &selected)
+					resume()
+				}()
+
+				pause()
+			case selectKey:
+				if nav.HasEntries() {
+					selected.DumpPrevious(nav.CurrentPath)
+					selected.Select(nav.GetCurrentEntry())
+					nav.MoveDown()
+					terminal.RenderOutput(&nav, &selected)
+
+				}
+
+			case selectAllKey:
+				if nav.HasEntries() {
+					selected.DumpPrevious(nav.CurrentPath)
+					selected.SelectAll(nav.Entries)
+					terminal.RenderOutput(&nav, &selected)
+				}
 
 			case downKey:
 				if nav.MoveDown() {
@@ -245,32 +250,35 @@ func main() {
 				enterSubfolder(&nav, &selected)
 
 			case leftKey:
-				if nav.GetCurrentPath() != nav.GetRootPath() {
+
+				if nav.CurrentPath != nav.RootPath {
 					if cachedEntries, ok := cache.Get(nav.GetParentPath()); ok {
-						nav.SetEntries(cachedEntries.Entries)
-						nav.SetDirSize(cachedEntries.Size)
-						nav.SetCurrentPath(nav.GetParentPath())
-						nav.SetStartLine(0)
-						nav.SetEndLine(0)
-						nav.SetCurrentIndex(nav.GetBackTrace())
+						nav.Entries = cachedEntries.Entries
+						nav.DirSize = cachedEntries.Size
+						nav.CurrentPath = nav.GetParentPath()
+						nav.StartLine = 0
+						nav.EndLine = 0
+						nav.CurrentIndex = nav.GetBackTrace()
+
 						nav.SortMode = 0
-						entry.SetSort(&nav.SortMode, nav.GetEntries())
+						entry.SetSort(&nav.SortMode, nav.Entries)
 						terminal.FlushOutput(&nav, &selected)
 
 					} else {
 						task.StartTicker()
 						newPath, newEntries := task.ScanDirectory(nav.GetParentPath())
-						nav.SetCurrentPath(newPath)
-						nav.SetEntries(newEntries)
-						nav.SetStartLine(0)
-						nav.SetEndLine(0)
-						nav.SetCurrentIndex(nav.GetBackTrace())
+						nav.CurrentPath = newPath
+						nav.Entries = newEntries
+						nav.StartLine = 0
+						nav.EndLine = 0
+						nav.CurrentIndex = nav.GetBackTrace()
+
 						nav.SortMode = 0
-						entry.SetSort(&nav.SortMode, nav.GetEntries())
+						entry.SetSort(&nav.SortMode, nav.Entries)
 						terminal.FlushOutput(&nav, &selected)
 
 						go func() {
-							task.ScanDirectorySize(nav.GetEntries(), nav.GetDirSize())
+							task.ScanDirectorySize(nav.Entries, &nav.DirSize)
 							sizeCalculationDone <- struct{}{}
 						}()
 
@@ -278,116 +286,51 @@ func main() {
 				}
 
 			case findKey:
-				task.PromptFindByName(nav.GetCurrentPath(), nav.GetEntries(), searchDone)
+				task.PromptFindByName(nav.CurrentPath, nav.Entries, searchDone)
 
-			case findSizeKey:
+			// case findSizeKey:
 
-				var unitAsString, pathName, pattern string
-				var unitAsInt int
-				var min, max float64 = 0, math.MaxFloat64
+			// 	task.PromptFindBySize()
 
-				task.WaitUserInput("Find by size, unit: ( 0=bytes 1=kb 2=mb 3=gb ) ", "2", func(s string) {
-					number, _ := strconv.Atoi(s)
-
-					if number < 0 || number > len(converter.StorageUnits)-1 {
-						utils.ShowErrAndContinue(errors.New("invalid unit index"))
-						return
-					}
-
-					unitAsString = converter.StorageUnits[number]
-					unitAsInt = number
-
-					task.WaitUserInput(fmt.Sprintf("%s %s", "Type min value in", unitAsString), "0", func(s string) {
-						num, err := strconv.ParseFloat(s, 64)
-						if err != nil {
-							utils.ShowErrAndContinue(err)
-							return
-						}
-
-						if num < 0 {
-							num = 0
-						}
-						min = num
-
-						task.WaitUserInput(fmt.Sprintf("%s %s", "Type max value ( 0 or no value means unlimited ) in", unitAsString), "", func(s string) {
-							if s != "" || s != "0" {
-								n, err := strconv.ParseFloat(s, 64)
-								if err != nil {
-									utils.ShowErrAndContinue(err)
-									return
-								}
-								max = n
-
-							}
-
-							if max < min {
-								utils.ShowErrAndContinue(fmt.Errorf("max value: %v, can't be lower than min value: %v", max, min))
-								return
-							}
-
-							task.WaitUserInput("Root directory to search from: ", "", func(s string) {
-								_, err := os.Stat(s)
-								if err != nil {
-									utils.ShowErrAndContinue(err)
-									return
-								}
-
-								pathName = s
-
-								task.WaitUserInput("Pattern to match: ", "", func(s string) {
-									pattern = s
-
-									minV, maxV := converter.ToBytes(converter.StorageUnits[unitAsInt], min, max)
-
-									task.StartTicker()
-
-									nav.ClearEntries()
-									terminal.ClearScreen()
-
-									go func() {
-										task.FindBySize(nav.GetEntries(), pathName, pattern, minV, maxV)
-										searchDone <- struct{}{}
-									}()
-								})
-							})
-						})
-					})
-				})
+			// 	go func() {
+			// 		task.FindBySize(nav.Entries, pathName, pattern, minV, maxV)
+			// 		searchDone <- struct{}{}
+			// 	}()
 
 			case sortKey:
 				if nav.HasEntries() {
 
-					entry.SetSort(&nav.SortMode, nav.GetEntries())
+					entry.SetSort(&nav.SortMode, nav.Entries)
 					terminal.RenderOutput(&nav, &selected)
 
 				}
 
 			case homeKey:
 				if nav.HasEntries() {
-					nav.SetCurrentIndex(0)
-					nav.SetStartLine(0)
+					nav.CurrentIndex = 0
+					nav.StartLine = 0
 					terminal.RenderOutput(&nav, &selected)
 				}
 
 			case endKey:
 				if nav.HasEntries() {
-					nav.SetCurrentIndex(nav.GetEntriesLength() - 1)
+					nav.CurrentIndex = nav.GetEntriesLength() - 1
 					if nav.GetEntriesLength() < nav.NumVisibleLines {
-						nav.SetStartLine(0)
+						nav.StartLine = 0
 					} else {
-						nav.SetStartLine(nav.GetEntriesLength() - nav.NumVisibleLines)
+						nav.StartLine = nav.GetEntriesLength() - nav.NumVisibleLines
 					}
 				}
 
 			case pgDownKey:
 				if nav.HasEntries() {
 					terminal.ClearScreen()
-					if nav.GetEntriesLength() < nav.GetCurrentIndex()+nav.NumVisibleLines {
+					if nav.GetEntriesLength() < nav.CurrentIndex+nav.NumVisibleLines {
 						nav.SetCurrentIndex(nav.GetEntriesLength() - 1)
 						nav.SetStartLine(nav.GetEntriesLength() - nav.NumVisibleLines)
 					} else {
-						nav.SetCurrentIndex(nav.GetCurrentIndex() + nav.NumVisibleLines)
-						nav.SetStartLine(nav.GetCurrentIndex())
+						nav.SetCurrentIndex(nav.CurrentIndex + nav.NumVisibleLines)
+						nav.SetStartLine(nav.CurrentIndex)
 					}
 
 					terminal.RenderOutput(&nav, &selected)
@@ -399,26 +342,10 @@ func main() {
 						nav.SetCurrentIndex(0)
 						nav.SetStartLine(0)
 					} else {
-						nav.SetCurrentIndex(nav.GetCurrentIndex() - nav.NumVisibleLines)
-						nav.SetStartLine(nav.GetCurrentIndex())
+						nav.SetCurrentIndex(nav.CurrentIndex - nav.NumVisibleLines)
+						nav.SetStartLine(nav.CurrentIndex)
 					}
 
-					terminal.RenderOutput(&nav, &selected)
-				}
-
-			case selectKey:
-				if nav.HasEntries() {
-					selected.DumpPrevious(nav.GetCurrentPath())
-					selected.Select(nav.GetCurrentEntry())
-					nav.IncrementIndex()
-					terminal.RenderOutput(&nav, &selected)
-
-				}
-
-			case selectAllKey:
-				if nav.HasEntries() {
-					selected.DumpPrevious(nav.GetCurrentPath())
-					selected.SelectAll(nav.GetEntries())
 					terminal.RenderOutput(&nav, &selected)
 				}
 
@@ -431,58 +358,64 @@ func main() {
 				}
 
 			case editKey:
+
 				if nav.HasEntries() {
 					if !nav.GetCurrentEntry().IsDir {
-						terminal.ClearScreen()
-						sizeBefore := nav.GetCurrentEntry().Size
-						task.Edit(nav.GetCurrentEntry().FullPath(), c.Cfg.DefaultEditor)
+						pause()
+						go func() {
+							terminal.ClearScreen()
+							sizeBefore := nav.GetCurrentEntry().Size
+							task.Edit(nav.GetCurrentEntry().FullPath(), c.Cfg.DefaultEditor)
 
-						info, _ := os.Stat(nav.GetCurrentEntry().FullPath())
+							info, _ := os.Stat(nav.GetCurrentEntry().FullPath())
 
-						if info.Size() != int64(sizeBefore) {
-							refresh()
-							terminal.ResetFlushOutput(&nav, &selected)
-						} else {
-							terminal.RenderOutput(&nav, &selected)
-						}
-
+							if info.Size() != int64(sizeBefore) {
+								refresh(&nav, &selected)
+								terminal.ResetFlushOutput(&nav, &selected)
+							} else {
+								terminal.RenderOutput(&nav, &selected)
+							}
+							resume()
+						}()
 					}
 				}
 
 			case renameKey:
 				if nav.HasEntries() {
-					task.WaitUserInput("rename", nav.GetCurrentEntry().Name, func(answ string) {
-						if strings.Contains(answ, string(os.PathSeparator)) {
-							utils.ShowErrAndContinue(fmt.Errorf("path separator can't be used inside name"))
 
-							terminal.ResetFlushOutput(&nav, &selected)
-							return
-						}
+					answ := task.WaitInput("rename", nav.GetCurrentEntry().Name)
 
-						if answ == "" {
-							utils.ShowErrAndContinue(fmt.Errorf("empty name?"))
-							terminal.ResetFlushOutput(&nav, &selected)
-							return
-						}
+					if strings.Contains(answ, string(os.PathSeparator)) {
+						utils.ShowErrAndContinue(fmt.Errorf("path separator can't be used inside name"))
 
-						_, err := os.Stat(filepath.Join(nav.GetCurrentPath(), answ))
-						if err == nil {
-
-							utils.ShowErrAndContinue(fmt.Errorf("entry already exists"))
-							terminal.ResetFlushOutput(&nav, &selected)
-							return
-
-						}
-
-						err = os.Rename(nav.GetCurrentEntry().FullPath(), filepath.Join(nav.GetCurrentPath(), answ))
-
-						if err != nil {
-							panic(err)
-						}
-
-						nav.GetCurrentEntry().Name = answ
 						terminal.ResetFlushOutput(&nav, &selected)
-					})
+						return
+					}
+
+					if answ == "" {
+						utils.ShowErrAndContinue(fmt.Errorf("empty name?"))
+						terminal.ResetFlushOutput(&nav, &selected)
+						return
+					}
+
+					_, err := os.Stat(filepath.Join(nav.CurrentPath, answ))
+					if err == nil {
+
+						utils.ShowErrAndContinue(fmt.Errorf("entry already exists"))
+						terminal.ResetFlushOutput(&nav, &selected)
+						return
+
+					}
+
+					err = os.Rename(nav.GetCurrentEntry().FullPath(), filepath.Join(nav.CurrentPath, answ))
+
+					if err != nil {
+						panic(err)
+					}
+
+					nav.GetCurrentEntry().Name = answ
+					terminal.ResetFlushOutput(&nav, &selected)
+
 				}
 
 			case enterKey:
@@ -495,50 +428,16 @@ func main() {
 					}
 				}
 			case deleteKey, deleteKey2, deleteKey3:
-				selected.DumpPrevious(nav.GetCurrentPath())
+
+				selected.DumpPrevious(nav.CurrentPath)
 				if !selected.IsEmpty() {
-					task.WaitUserInput("Delete selected entries", "y", func(answ string) {
-						if answ == "y" {
-
-							stopProgress := make(chan struct{}, 1)
-							currentFileName := make(chan string)
-
-							go func() {
-								terminal.PrintProgress(stopProgress, currentFileName)
-							}()
-
-							var deleteGroup sync.WaitGroup
-
-							for key := range selected.GetAll() {
-
-								deleteGroup.Add(1)
-								go func(en *entry.Entry) {
-									defer func() {
-										deleteGroup.Done()
-										currentFileName <- fmt.Sprint("Deleted ", en.Name, " ")
-									}()
-
-									err := os.RemoveAll(en.FullPath())
-									if err != nil {
-										if errors.Is(err, os.ErrPermission) {
-											utils.ShowErrAndContinue(err)
-											return
-										} else {
-											fmt.Println(err)
-											os.Exit(1)
-										}
-									}
-								}(key)
-								// time.Sleep(time.Millisecond * 50)
-							}
-							deleteGroup.Wait()
-
-							stopProgress <- struct{}{}
-
-							refresh()
-							terminal.ResetFlushOutput(&nav, &selected)
-						}
-					})
+					pause()
+					go func() {
+						task.DeleteSelected(&selected, &nav)
+						refresh(&nav, &selected)
+						terminal.ResetFlushOutput(&nav, &selected)
+						resume()
+					}()
 				}
 
 			case nextThemeKey:
@@ -556,236 +455,123 @@ func main() {
 				terminal.RenderOutput(&nav, &selected)
 
 			case execKey:
-				task.WaitUserInput("run command: ", "", func(input string) {
-					terminal.ClearScreen()
-					task.ExecCommand(input)
-				})
+				input := task.WaitInput("run command: ", "")
+
+				terminal.ClearScreen()
+				task.ExecCommand(input)
 
 				terminal.ResetFlushOutput(&nav, &selected)
 
 			case copyKey, moveKey:
 
-				stopProgress := make(chan struct{}, 1)
-				currentFileName := make(chan string)
-				var w sync.WaitGroup
-				sem := make(chan struct{}, c.Cfg.MaxWorkers)
-
 				if selected.IsEmpty() {
 					continue
 				}
 
-				var ask string
+				var prompt string
+				var rem bool
 
 				if event.Key == moveKey {
-					ask = "Move"
+					prompt = "Move"
+					rem = true
 				} else {
-					ask = "Copy"
+					prompt = "Copy"
 				}
 
-				task.WaitUserInput(fmt.Sprintf("%s %s", ask, "selected into the current directory? :"), "y", func(s string) {
-					var mv func(string, string, string)
+				pause()
 
-					writeFile := func(srcPath, srcName, targetPath string) {
-						newFilepath := filepath.Join(targetPath, srcName)
-
-						srcFile, err := os.Open(filepath.Join(srcPath, srcName))
-						if err != nil {
-							panic(err)
-						}
-
-						defer srcFile.Close()
-
-						targetFile, err := os.Create(newFilepath)
-						if err != nil {
-							panic(err)
-						}
-						defer targetFile.Close()
-
-						_, err = io.Copy(targetFile, srcFile)
-						if err != nil {
-							panic(err)
-						}
-
-						info, err := os.Stat(filepath.Join(srcPath, srcName))
-						if err != nil {
-							fmt.Println(err)
-							os.Exit(0)
-
-						}
-
-						err = os.Chmod(newFilepath, info.Mode())
-						if err != nil {
-							panic(err)
-						}
-					}
-
-					//	var moveWg sync.WaitGroup
-
-					mv = func(srcPath, srcName, targetDir string) {
-						srcInfo, err := os.Stat(filepath.Join(srcPath, srcName))
-						if err != nil {
-							fmt.Println(err)
-							os.Exit(0)
-						}
-
-						if srcInfo.IsDir() {
-							proceed := true
-
-							err := os.Mkdir(filepath.Join(targetDir, srcName), srcInfo.Mode())
-							if err != nil {
-								if errors.Is(err, os.ErrExist) {
-									task.WaitUserInput(fmt.Sprintf("%s %s %s", "Folder ", srcName, " already exists, do you wish to merge them?"), "y", func(answ string) {
-										if answ == "y" || answ == strings.ToLower("YES") {
-											proceed = true
-										} else {
-											proceed = false
-										}
-									})
-								}
-							}
-
-							if proceed {
-
-								dc, err := os.ReadDir(filepath.Join(srcPath, srcName))
-								if err != nil {
-									fmt.Println(err)
-									done <- true
-
-								}
-
-								for _, entry := range dc {
-									// moveWg.Add(1)
-									// go func(srcPat, srcName, targetDir string, entry fs.DirEntry) {
-									// defer func() {
-									// 		moveChan <- filepath.Join(targetDir, srcName)
-									// 		// moveWg.Done()
-									// 	}()
-									// 	mv(filepath.Join(srcPath, srcName), entry.Name(), filepath.Join(targetDir, srcName))
-									// }(srcPath, srcName, targetDir, entry)
-
-									mv(filepath.Join(srcPath, srcName), entry.Name(), filepath.Join(targetDir, srcName))
-
-									// moveChan <- filepath.Join(targetDir, srcName)
-									// terminal.ClearLine()
-									// terminal.CarriageReturn()
-									// fmt.Print(terminal.Prompt("Copied " + filepath.Join(targetDir, srcName)))
-								}
-
-							}
-
-							if event.Key == moveKey {
-								err := os.RemoveAll(filepath.Join(srcPath, srcName))
-								if err != nil {
-									panic(err)
-								}
-							}
-
-						} else {
-
-							_, err := os.Stat(filepath.Join(targetDir, srcName))
-
-							if err != nil && errors.Is(err, os.ErrNotExist) {
-								w.Add(1)
-								sem <- struct{}{}
-								go func(srcPath, srcName, targetDir string) {
-									defer func() {
-										w.Done()
-										currentFileName <- fmt.Sprint("Written ", filepath.Join(targetDir, srcName), " ")
-										<-sem
-									}()
-
-									writeFile(srcPath, srcName, targetDir)
-								}(srcPath, srcName, targetDir)
-
-								// terminal.ClearLine()
-								// terminal.CarriageReturn()
-								// fmt.Print(terminal.Prompt("Copied " + filepath.Join(targetDir, srcPath)))
-							} else {
-								task.WaitUserInput(fmt.Sprintf("%s %s %s", "File", srcName, " already exists, do you wish to overwrite it?"), "y", func(answ string) {
-									if answ == "y" || answ == strings.ToLower("YES") {
-
-										w.Add(1)
-										sem <- struct{}{}
-
-										go func(srcPath, srcName, targetDir string) {
-											defer func() {
-												w.Done()
-												currentFileName <- fmt.Sprint("Written ", filepath.Join(targetDir, srcName), " ")
-												<-sem
-											}()
-
-											os.Remove(filepath.Join(targetDir, srcName))
-											writeFile(srcPath, srcName, targetDir)
-										}(srcPath, srcName, targetDir)
-
-										// terminal.ClearLine()
-										// terminal.CarriageReturn()
-										// fmt.Print(terminal.Prompt("Copied " + filepath.Join(targetDir, srcPath)))
-									}
-								})
-							}
-
-						}
-					}
-
-					if s == "y" {
-
-						go func() {
-							terminal.PrintProgress(stopProgress, currentFileName)
-						}()
-
-						for entry := range selected.GetAll() {
-
-							if *entry.Path == nav.GetCurrentPath() {
-								utils.ShowErrAndContinue(errors.New("copying / moving within same directory is not permitted"))
-								return
-							}
-
-							if strings.HasPrefix(nav.GetCurrentPath(), entry.FullPath()) {
-								utils.ShowErrAndContinue(errors.New("cannot move / copy a folder into itself"))
-								return
-							}
-
-							w.Add(1)
-							go func(path string, name string, currentPath string) {
-								defer w.Done()
-
-								mv(path, name, currentPath)
-							}(*entry.Path, entry.Name, nav.GetCurrentPath())
-
-						}
-						w.Wait()
-
-						stopProgress <- struct{}{}
-						// wg.Wait()
-						refresh()
-						// TODO: after copying sort according to current sorting alghoritm
-					}
-				})
+				go func() {
+					task.Relocate(prompt, rem, &selected, &nav)
+					refresh(&nav, &selected)
+					resume()
+				}()
 
 			case newFileKey:
 
-				if task.CreateFsFile(nav.GetCurrentPath()) {
-					//	sortMode = entry.SortByName(entries)
+				go func() {
+					if task.CreateFsFile(nav.CurrentPath) {
+						//	sortMode = entry.SortByName(entries)
 
-					refresh()
-				}
-
+						refresh(&nav, &selected)
+					}
+					resume()
+				}()
+				pause()
 			case newDirKey:
+				// keyListener = false
+				// return
+				pause()
+				go func() {
+					fmt.Println("Doing some intensive task..")
+					time.Sleep(time.Second * 1)
+					resumeNavigationChan <- struct{}{}
+				}()
 
-				if task.CreateFsDirectory(nav.GetCurrentPath()) {
-					refresh()
-				}
+				// if task.CreateFsDirectory(nav.CurrentPath) {
+				// 	refresh(&nav, &selected)
+				// }
 
 			case quitKey, quitKey2:
 				terminal.ClearScreen()
-
-				keyListener = false
-				return
+				stopNavigation <- struct{}{}
+				// pauseNavigation <- struct{}{}
 
 			}
 
 		}
+	}
+}
 
+func pause() {
+	// fmt.Println("stopping navigation mode")
+	// time.Sleep(time.Second * 1)
+	pauseNavigation <- struct{}{}
+	time.Sleep(time.Millisecond * 50)
+}
+
+func resume() {
+	// fmt.Println("resuming navigation")
+	// time.Sleep(time.Second * 1)
+	resumeNavigationChan <- struct{}{}
+}
+
+func resumeNavigation() {
+}
+
+func main() {
+	terminal.ClearScreen()
+
+	terminal.PrintBanner()
+
+	scan(&nav, &selected)
+	terminal.ClearScreen()
+
+	terminal.PrintPane(2, 1)
+	//	terminal.PrintPane(2, terminal.GetPaneWidth())
+	// terminal.Cell(terminal.GetNumVisibleLines(), terminal.PaneW
+	// fmt.Print("help")
+	navigate()
+	for {
+		select {
+		case <-exit:
+
+			return
+		case <-resumeNavigationChan:
+			// fmt.Println("resume signal received")
+			// time.Sleep(time.Second * 1)
+			// wg.Add(1)
+
+			go func() {
+				// defer wg.Done()
+				// fmt.Println("resuming navigation")
+				// time.Sleep(time.Second * 1)
+				// refresh(&nav, &selected)
+
+				keyListener = true
+				// fmt.Println("keylistener on")
+				// time.Sleep(time.Second * 1)
+				navigate()
+			}()
+		}
 	}
 }

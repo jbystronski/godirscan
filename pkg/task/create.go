@@ -11,60 +11,63 @@ import (
 )
 
 func CreateFsFile(path string) (ok bool) {
-	WaitUserInput("Create a new file: ", "", func(name string) {
-		name = strings.TrimSpace(name)
-		if strings.ContainsAny(name, string(os.PathSeparator)) {
-			utils.ShowErrAndContinue(fmt.Errorf("%s: %v", "filename contains path separator, aborting", os.PathSeparator))
+	name := WaitInput("Create a new file: ", "")
 
-			return
-		}
-		newFilePath := filepath.Join(path, name)
+	name = strings.TrimSpace(name)
+	if strings.ContainsAny(name, string(os.PathSeparator)) {
+		utils.ShowErrAndContinue(fmt.Errorf("%s: %v", "filename contains path separator, aborting", os.PathSeparator))
 
-		_, err := os.Stat(newFilePath)
+		return
+	}
+	newFilePath := filepath.Join(path, name)
 
-		if err != nil && errors.Is(err, os.ErrNotExist) {
+	_, err := os.Stat(newFilePath)
 
-			_, err := os.Create(newFilePath)
+	if err != nil && errors.Is(err, os.ErrNotExist) {
+
+		_, err := os.Create(newFilePath)
+		if err != nil {
 			if err != nil {
-				if err != nil {
-					fmt.Println(err)
-					os.Exit(0)
-				}
+				fmt.Println(err)
+				os.Exit(0)
 			}
+		}
+
+		ok = true
+
+	} else {
+
+		name = WaitInput(fmt.Sprintf("%s (%s) %s", "File", name, "already exists, do you wish to override it?"), "n")
+
+		if name == "y" || name == strings.ToLower("YES") {
+			os.Truncate(newFilePath, 0)
 
 			ok = true
 
-		} else {
-			WaitUserInput(fmt.Sprintf("%s (%s) %s", "File", name, "already exists, do you wish to override it?"), "n", func(answ string) {
-				if answ == "y" || answ == strings.ToLower("YES") {
-					os.Truncate(newFilePath, 0)
-
-					ok = true
-
-				}
-			})
 		}
-	})
+
+	}
+
 	return
 }
 
 func CreateFsDirectory(path string) (ok bool) {
-	WaitUserInput("Create directory: ", "", func(name string) {
-		name = strings.TrimSpace(name)
-		if strings.ContainsAny(name, string(os.PathSeparator)) {
-			utils.ShowErrAndContinue(fmt.Errorf("%s \"%v\"", "Folder name cannot contain", string(os.PathSeparator)))
+	dir := WaitInput("Create directory: ", "")
 
-			return
-		}
-		newDirPath := filepath.Join(path, name)
-		err := os.Mkdir(newDirPath, 0o777)
-		if err != nil {
-			utils.ShowErrAndContinue(err)
-			return
-		}
+	dir = strings.TrimSpace(dir)
+	if strings.ContainsAny(dir, string(os.PathSeparator)) {
+		utils.ShowErrAndContinue(fmt.Errorf("%s \"%v\"", "Folder name cannot contain", string(os.PathSeparator)))
 
-		ok = true
-	})
+		return
+	}
+	newDirPath := filepath.Join(path, dir)
+	err := os.Mkdir(newDirPath, 0o777)
+	if err != nil {
+		utils.ShowErrAndContinue(err)
+		return
+	}
+
+	ok = true
 
 	return
 }

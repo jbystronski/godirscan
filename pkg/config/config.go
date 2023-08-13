@@ -15,17 +15,18 @@ import (
 type Config struct {
 	CurrentSchema        uint             `json:"set_palette"`
 	DefaultRootDirectory string           `json:"default_root"`
-	SilentMode           bool             `josn:"silent_mode"`
 	DefaultEditor        string           `json:"default_editor"`
 	MaxWorkers           int              `json:"max_concurrent_workers"`
 	ColorSchemas         []terminal.Theme `json:"color_schemas"`
 }
 
+const configFileName = "godirscan.json"
+
 var Cfg = &Config{}
 
 var defaultConfig = Config{
-	CurrentSchema:        0,
-	SilentMode:           false,
+	CurrentSchema: 0,
+
 	DefaultEditor:        "nano",
 	DefaultRootDirectory: getUserDirectory(),
 	MaxWorkers:           1500,
@@ -106,16 +107,6 @@ func ParseColorSchema(num uint, theme *terminal.Theme) {
 
 	parse([]string{s.BgHighlight, s.BgHeader, s.BgSelect, s.BgPrompt}, []*string{&theme.BgHighlight, &theme.BgHeader, &theme.BgSelect, &theme.BgPrompt}, terminal.BackgroundsMap, "white")
 }
-
-const (
-	configFileName = "godirscan.json"
-	// fmtDir           = terminal.BgYellow
-	// fmtFile          = terminal.BrightMagenta
-	// promptBackground = terminal.BgYellow
-	// promptColor      = terminal.Black
-
-	pSeparator = string(os.PathSeparator)
-)
 
 func findOrCreateConfigFile() *os.File {
 	var cFile *os.File
