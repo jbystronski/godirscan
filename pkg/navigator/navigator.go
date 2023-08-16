@@ -11,11 +11,15 @@ import (
 type Navigator struct {
 	NumVisibleLines, DirSize, CurrentIndex int
 	StartLine, EndLine                     int
-
-	SortMode              uint8
-	Entries               []*entry.Entry
-	backTrace             []int
-	CurrentPath, RootPath string
+	StartCell                              int
+	RowWidth                               int
+	SortMode                               uint8
+	Entries                                []*entry.Entry
+	backTrace                              []int
+	CurrentPath, RootPath                  string
+	ActiveRowIndex                         int
+	ActiveRowText                          string
+	IsActive                               bool
 }
 
 func NewNavigator() *Navigator {

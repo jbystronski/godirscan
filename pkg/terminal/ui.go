@@ -20,6 +20,7 @@ func Prompt(prompt string) string {
 
 func highlightRow(sep string, en entry.Entry) {
 	fmt.Printf("%s%s%s%s%s\n", CurrentTheme.BgHighlight, CurrentTheme.Highlight+BoldFmt, sep, en.Name+Space+en.PrintSize(), ResetFmt)
+
 	// moveToEndOfLine()
 	// printBorder()
 }

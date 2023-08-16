@@ -188,8 +188,8 @@ func MoveCursorTop() {
 	fmt.Print(CursorTop)
 }
 
-func clearCells(row, col, length int) {
-	Cell(row, col)
+func ClearRow(row, offsetLeft, length int) {
+	Cell(row, offsetLeft)
 	fmt.Print(strings.Repeat(Space, length))
 }
 
@@ -220,30 +220,58 @@ func RenderOutput(n *navigator.Navigator, s *navigator.Selected) {
 	// Cell(1, 1)
 	// printHeader(n.CurrentPath + Space + entry.PrintSizeAsString(*n.GetDirSize()))
 	// MoveCursorTop()
-	Cell(1, 1)
-	ClearLine()
+	//	Cell(1, 1)
+	ClearRow(1, n.StartCell, n.RowWidth)
+	Cell(1, n.StartCell-1)
 	// clearCells(1, 1, getPaneWidth())
 	printHeader(n.CurrentPath + Space + entry.PrintSizeAsString(*n.GetDirSize()))
-	visibleLines := 20
-	Cell(3, 2)
+	totalLines := GetNumVisibleLines()
+	// startLine := 3
+	currentRow := 3
+	lastRow := totalLines - 2
+	visibleRows := lastRow - currentRow
+
+	var startIndex, endIndex int
+
+	if n.CurrentIndex > visibleRows {
+		startIndex = n.CurrentIndex - visibleRows
+		endIndex = n.CurrentIndex
+	} else {
+		startIndex = 0
+		endIndex = lastRow - currentRow
+	}
+
 	var sep string
-	for i := 0; i <= visibleLines; i++ {
-		if i == n.GetEntriesLength() {
-			sep = CornerLine + Hseparator
+	for i := startIndex; i <= endIndex; i++ {
+
+		ClearRow(currentRow, n.StartCell, n.RowWidth)
+		Cell(currentRow, n.StartCell)
+		if i >= n.GetEntriesLength() {
+			currentRow++
+			continue
 		} else {
-			sep = TeeLine + Hseparator
+			if i == n.GetEntriesLength()-1 {
+				sep = CornerLine + Hseparator
+			} else {
+				sep = TeeLine + Hseparator
+			}
+
+			if n.CurrentIndex == i && n.IsActive {
+				highlightRow(sep, *n.GetEntry(i))
+			} else if _, ok := s.SelectedEntries[n.GetEntry(i)]; ok {
+				MarkRow(sep, *n.GetEntry(i))
+			} else {
+				printRow(sep, *n.GetEntry(i))
+			}
+
+			currentRow++
 		}
 
-		if n.CurrentIndex == i {
-			highlightRow(sep, *n.GetEntry(i))
-		} else if _, ok := s.SelectedEntries[n.GetEntry(i)]; ok {
-			MarkRow(sep, *n.GetEntry(i))
-		} else {
-			printRow(sep, *n.GetEntry(i))
-		}
+		//		Cell(currentRow, n.StartCell)
 
 	}
-	Cell(GetNumVisibleLines(), 1)
+	Cell(lastRow+2, 1)
+	// Cell(GetNumVisibleLines(), 1)
 	// MoveCursorTop()
 	// n.NumVisibleLines = GetNumVisibleLines() - reserverdRows
 

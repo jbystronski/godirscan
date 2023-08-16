@@ -65,6 +65,7 @@ var (
 	backSpaceKey  = k.KeyBackspace
 	backSpaceKey2 = k.KeyBackspace2
 	nextThemeKey  = k.KeyCtrlSlash
+	switchPaneKey = k.KeyTab
 
 	rejectChar = 'n'
 	acceptChar = 'y'
@@ -72,7 +73,8 @@ var (
 )
 
 var (
-	nav                  navigator.Navigator
+	// nav                  navigator.Navigator
+	firstRender          = true
 	selected             navigator.Selected
 	wg                   sync.WaitGroup
 	sizeCalculationDone  = make(chan struct{})
@@ -82,6 +84,10 @@ var (
 	resumeNavigationChan = make(chan struct{}, 1)
 	taskDone             = make(chan func())
 	exit                 = make(chan bool, 1)
+	paneWidth            int
+	activePane           = 0
+	navigators           []navigator.Navigator
+	nav                  *navigator.Navigator
 
 	done = make(chan bool)
 )
@@ -89,7 +95,18 @@ var (
 func init() {
 	c.ParseConfigFile(c.Cfg)
 	c.ParseColorSchema(c.Cfg.CurrentSchema, &terminal.CurrentTheme)
-	nav = *navigator.NewNavigator()
+
+	paneWidth = terminal.GetPaneWidth()
+	//	nav = *navigator.NewNavigator()
+	navigators = append(navigators, *navigator.NewNavigator())
+	navigators[0].StartCell = 2
+	navigators[0].RowWidth = paneWidth - 2
+	nav = &navigators[0]
+	nav.IsActive = true
+	navigators = append(navigators, *navigator.NewNavigator())
+	navigators[1].StartCell = paneWidth + 2
+	navigators[1].RowWidth = paneWidth - 2
+
 	selected = *navigator.NewSelected()
 }
 
@@ -190,10 +207,26 @@ func navigate() {
 
 			task.StopTicker()
 			cache.Store(nav.CurrentPath, *&nav.DirSize, nav.Entries)
-			terminal.RenderOutput(&nav, &selected)
+			terminal.RenderOutput(nav, &selected)
+			if firstRender {
+
+				navigators[1].Entries = append(navigators[1].Entries, nav.Entries...)
+				navigators[1].DirSize = nav.DirSize
+				navigators[1].CurrentPath = nav.CurrentPath
+				navigators[1].RootPath = nav.RootPath
+
+				terminal.RenderOutput(&navigators[1], &selected)
+				firstRender = false
+			}
+
 		case <-task.Ticker.C:
 
-			terminal.RenderOutput(&nav, &selected)
+			terminal.RenderOutput(nav, &selected)
+
+			// if firstRender {
+			// 	terminal.RenderOutput(&navigators[1], &selected)
+			// }
+
 		case <-searchDone:
 			if nav.GetEntriesLength() == 0 {
 				fmt.Println("no entries found")
@@ -201,6 +234,28 @@ func navigate() {
 
 		case event := <-keysEvents:
 			switch event.Key {
+
+			case switchPaneKey:
+
+				if activePane == 0 {
+					activePane = 1
+					nav.IsActive = false
+					terminal.RenderOutput(nav, &selected)
+					navigators[0] = *nav
+					*nav = navigators[1]
+					nav.IsActive = true
+
+				} else {
+					activePane = 0
+					nav.IsActive = false
+					terminal.RenderOutput(nav, &selected)
+					navigators[1] = *nav
+
+					*nav = navigators[0]
+					nav.IsActive = true
+				}
+
+				terminal.RenderOutput(nav, &selected)
 			case menuKey:
 
 				go func() {
@@ -208,7 +263,7 @@ func navigate() {
 					terminal.PrintHelp()
 
 					resumeNavigation()
-					terminal.ResetFlushOutput(&nav, &selected)
+					terminal.ResetFlushOutput(nav, &selected)
 				}()
 				pauseNavigation <- struct{}{}
 
@@ -216,7 +271,7 @@ func navigate() {
 				return
 			case scanKey:
 				go func() {
-					scan(&nav, &selected)
+					scan(nav, &selected)
 					resume()
 				}()
 
@@ -226,7 +281,7 @@ func navigate() {
 					selected.DumpPrevious(nav.CurrentPath)
 					selected.Select(nav.GetCurrentEntry())
 					nav.MoveDown()
-					terminal.RenderOutput(&nav, &selected)
+					terminal.RenderOutput(nav, &selected)
 
 				}
 
@@ -234,20 +289,20 @@ func navigate() {
 				if nav.HasEntries() {
 					selected.DumpPrevious(nav.CurrentPath)
 					selected.SelectAll(nav.Entries)
-					terminal.RenderOutput(&nav, &selected)
+					terminal.RenderOutput(nav, &selected)
 				}
 
 			case downKey:
 				if nav.MoveDown() {
-					terminal.RenderOutput(&nav, &selected)
+					terminal.RenderOutput(nav, &selected)
 				}
 
 			case upKey:
 				if nav.MoveUp() {
-					terminal.RenderOutput(&nav, &selected)
+					terminal.RenderOutput(nav, &selected)
 				}
 			case rightKey:
-				enterSubfolder(&nav, &selected)
+				enterSubfolder(nav, &selected)
 
 			case leftKey:
 
@@ -262,7 +317,7 @@ func navigate() {
 
 						nav.SortMode = 0
 						entry.SetSort(&nav.SortMode, nav.Entries)
-						terminal.FlushOutput(&nav, &selected)
+						terminal.FlushOutput(nav, &selected)
 
 					} else {
 						task.StartTicker()
@@ -275,7 +330,7 @@ func navigate() {
 
 						nav.SortMode = 0
 						entry.SetSort(&nav.SortMode, nav.Entries)
-						terminal.FlushOutput(&nav, &selected)
+						terminal.FlushOutput(nav, &selected)
 
 						go func() {
 							task.ScanDirectorySize(nav.Entries, &nav.DirSize)
@@ -301,7 +356,7 @@ func navigate() {
 				if nav.HasEntries() {
 
 					entry.SetSort(&nav.SortMode, nav.Entries)
-					terminal.RenderOutput(&nav, &selected)
+					terminal.RenderOutput(nav, &selected)
 
 				}
 
@@ -309,7 +364,7 @@ func navigate() {
 				if nav.HasEntries() {
 					nav.CurrentIndex = 0
 					nav.StartLine = 0
-					terminal.RenderOutput(&nav, &selected)
+					terminal.RenderOutput(nav, &selected)
 				}
 
 			case endKey:
@@ -333,7 +388,7 @@ func navigate() {
 						nav.SetStartLine(nav.CurrentIndex)
 					}
 
-					terminal.RenderOutput(&nav, &selected)
+					terminal.RenderOutput(nav, &selected)
 				}
 
 			case pgUpKey:
@@ -346,7 +401,7 @@ func navigate() {
 						nav.SetStartLine(nav.CurrentIndex)
 					}
 
-					terminal.RenderOutput(&nav, &selected)
+					terminal.RenderOutput(nav, &selected)
 				}
 
 			case viewKey:
@@ -370,10 +425,10 @@ func navigate() {
 							info, _ := os.Stat(nav.GetCurrentEntry().FullPath())
 
 							if info.Size() != int64(sizeBefore) {
-								refresh(&nav, &selected)
-								terminal.ResetFlushOutput(&nav, &selected)
+								refresh(nav, &selected)
+								terminal.ResetFlushOutput(nav, &selected)
 							} else {
-								terminal.RenderOutput(&nav, &selected)
+								terminal.RenderOutput(nav, &selected)
 							}
 							resume()
 						}()
@@ -388,13 +443,13 @@ func navigate() {
 					if strings.Contains(answ, string(os.PathSeparator)) {
 						utils.ShowErrAndContinue(fmt.Errorf("path separator can't be used inside name"))
 
-						terminal.ResetFlushOutput(&nav, &selected)
+						terminal.ResetFlushOutput(nav, &selected)
 						return
 					}
 
 					if answ == "" {
 						utils.ShowErrAndContinue(fmt.Errorf("empty name?"))
-						terminal.ResetFlushOutput(&nav, &selected)
+						terminal.ResetFlushOutput(nav, &selected)
 						return
 					}
 
@@ -402,7 +457,7 @@ func navigate() {
 					if err == nil {
 
 						utils.ShowErrAndContinue(fmt.Errorf("entry already exists"))
-						terminal.ResetFlushOutput(&nav, &selected)
+						terminal.ResetFlushOutput(nav, &selected)
 						return
 
 					}
@@ -414,7 +469,7 @@ func navigate() {
 					}
 
 					nav.GetCurrentEntry().Name = answ
-					terminal.ResetFlushOutput(&nav, &selected)
+					terminal.ResetFlushOutput(nav, &selected)
 
 				}
 
@@ -424,7 +479,7 @@ func navigate() {
 					case false:
 						task.ExecuteDefault(nav.GetCurrentEntry().FullPath())
 					default:
-						enterSubfolder(&nav, &selected)
+						enterSubfolder(nav, &selected)
 					}
 				}
 			case deleteKey, deleteKey2, deleteKey3:
@@ -433,9 +488,9 @@ func navigate() {
 				if !selected.IsEmpty() {
 					pause()
 					go func() {
-						task.DeleteSelected(&selected, &nav)
-						refresh(&nav, &selected)
-						terminal.ResetFlushOutput(&nav, &selected)
+						task.DeleteSelected(&selected, nav)
+						refresh(nav, &selected)
+						terminal.ResetFlushOutput(nav, &selected)
 						resume()
 					}()
 				}
@@ -452,7 +507,7 @@ func navigate() {
 				config.ParseColorSchema(num, &terminal.CurrentTheme)
 				config.UpdateConfigFile(config.Cfg)
 
-				terminal.RenderOutput(&nav, &selected)
+				terminal.RenderOutput(nav, &selected)
 
 			case execKey:
 				input := task.WaitInput("run command: ", "")
@@ -460,7 +515,7 @@ func navigate() {
 				terminal.ClearScreen()
 				task.ExecCommand(input)
 
-				terminal.ResetFlushOutput(&nav, &selected)
+				terminal.ResetFlushOutput(nav, &selected)
 
 			case copyKey, moveKey:
 
@@ -481,8 +536,8 @@ func navigate() {
 				pause()
 
 				go func() {
-					task.Relocate(prompt, rem, &selected, &nav)
-					refresh(&nav, &selected)
+					task.Relocate(prompt, rem, &selected, nav)
+					refresh(nav, &selected)
 					resume()
 				}()
 
@@ -492,7 +547,7 @@ func navigate() {
 					if task.CreateFsFile(nav.CurrentPath) {
 						//	sortMode = entry.SortByName(entries)
 
-						refresh(&nav, &selected)
+						refresh(nav, &selected)
 					}
 					resume()
 				}()
@@ -508,7 +563,7 @@ func navigate() {
 				}()
 
 				// if task.CreateFsDirectory(nav.CurrentPath) {
-				// 	refresh(&nav, &selected)
+				// 	refresh(nav, &selected)
 				// }
 
 			case quitKey, quitKey2:
@@ -543,13 +598,13 @@ func main() {
 
 	terminal.PrintBanner()
 
-	scan(&nav, &selected)
+	scan(nav, &selected)
+
 	terminal.ClearScreen()
 
-	terminal.PrintPane(2, 1)
-	//	terminal.PrintPane(2, terminal.GetPaneWidth())
-	// terminal.Cell(terminal.GetNumVisibleLines(), terminal.PaneW
-	// fmt.Print("help")
+	terminal.PrintPane(2, 1, paneWidth)
+	terminal.PrintPane(2, paneWidth+1, paneWidth*2)
+
 	navigate()
 	for {
 		select {
@@ -565,7 +620,7 @@ func main() {
 				// defer wg.Done()
 				// fmt.Println("resuming navigation")
 				// time.Sleep(time.Second * 1)
-				// refresh(&nav, &selected)
+				// refresh(nav, &selected)
 
 				keyListener = true
 				// fmt.Println("keylistener on")

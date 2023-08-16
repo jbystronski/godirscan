@@ -11,24 +11,25 @@ const (
 	startRow      = 3
 )
 
-func PrintPane(offsetLeft, offsetTop int) {
+func PrintPane(line, startCol, endCol int) {
 	//	height := GetNumVisibleLines() - reserverdRows
 
 	// ClearScreen()
-	Cell(offsetLeft, offsetTop)
+	Cell(line, startCol)
 	printTopBorder()
 	// Cell(8, 1)
-	for i := 3; i < GetNumVisibleLines()-1; i++ {
-
+	for i := 3; i < GetNumVisibleLines(); i++ {
+		Cell(i, startCol)
 		printBorder()
-		Cell(i, offsetLeft)
 
+		Cell(i, endCol)
 		printBorder()
 		fmt.Print("\n")
+		line++
 	}
-
+	Cell(line, startCol)
 	printBottomBorder()
-	fmt.Print(offsetLeft)
+	// fmt.Print(colNumber)
 }
 
 func GetPaneWidth() int {
