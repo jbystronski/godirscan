@@ -86,8 +86,9 @@ var (
 	exit                 = make(chan bool, 1)
 	paneWidth            int
 	activePane           = 0
-	navigators           []navigator.Navigator
-	nav                  *navigator.Navigator
+	// navigators           []navigator.Navigator
+	leftNav, rightNav, nav *navigator.Navigator
+	// nav, inactiveNav             *navigator.Navigator
 
 	done = make(chan bool)
 )
@@ -98,14 +99,27 @@ func init() {
 
 	paneWidth = terminal.GetPaneWidth()
 	//	nav = *navigator.NewNavigator()
-	navigators = append(navigators, *navigator.NewNavigator())
-	navigators[0].StartCell = 2
-	navigators[0].RowWidth = paneWidth - 2
-	nav = &navigators[0]
+	leftNav = navigator.NewNavigator()
+	leftNav.StartCell = 2
+	leftNav.RowWidth = paneWidth - 2
+
+	nav = leftNav
 	nav.IsActive = true
-	navigators = append(navigators, *navigator.NewNavigator())
-	navigators[1].StartCell = paneWidth + 2
-	navigators[1].RowWidth = paneWidth - 2
+	// leftNav.IsActive = true
+	// nav.StartCell = 2
+	// nav.RowWidth = paneWidth - 2
+	rightNav = navigator.NewNavigator()
+	rightNav.StartCell = paneWidth + 2
+	rightNav.RowWidth = paneWidth - 2
+
+	// navigators = append(navigators, *navigator.NewNavigator())
+	// navigators[0].StartCell = 2
+	// navigators[0].RowWidth = paneWidth - 2
+	// nav = &navigators[0]
+	// nav.IsActive = true
+	// navigators = append(navigators, *navigator.NewNavigator())
+	// navigators[1].StartCell = paneWidth + 2
+	// navigators[1].RowWidth = paneWidth - 2
 
 	selected = *navigator.NewSelected()
 }
@@ -210,12 +224,16 @@ func navigate() {
 			terminal.RenderOutput(nav, &selected)
 			if firstRender {
 
-				navigators[1].Entries = append(navigators[1].Entries, nav.Entries...)
-				navigators[1].DirSize = nav.DirSize
-				navigators[1].CurrentPath = nav.CurrentPath
-				navigators[1].RootPath = nav.RootPath
+				// navigators[1].Entries = append(navigators[1].Entries, nav.Entries...)
+				// navigators[1].DirSize = nav.DirSize
+				// navigators[1].CurrentPath = nav.CurrentPath
+				// navigators[1].RootPath = nav.RootPath
+				rightNav.Entries = append(rightNav.Entries, nav.Entries...)
+				rightNav.DirSize = nav.DirSize
+				rightNav.CurrentPath = nav.CurrentPath
+				rightNav.RootPath = nav.RootPath
 
-				terminal.RenderOutput(&navigators[1], &selected)
+				terminal.RenderOutput(rightNav, &selected)
 				firstRender = false
 			}
 
@@ -237,25 +255,38 @@ func navigate() {
 
 			case switchPaneKey:
 
-				if activePane == 0 {
-					activePane = 1
-					nav.IsActive = false
-					terminal.RenderOutput(nav, &selected)
-					navigators[0] = *nav
-					*nav = navigators[1]
-					nav.IsActive = true
+				// if activePane == 0 {
+				// 	activePane = 1
+				// 	nav.IsActive = false
+				// 	terminal.RenderOutput(nav, &selected)
+				// 	navigators[0] = *nav
+				// 	*nav = navigators[1]
+				// 	nav.IsActive = true
 
+				// } else {
+				// 	activePane = 0
+				// 	nav.IsActive = false
+				// 	terminal.RenderOutput(nav, &selected)
+				// 	navigators[1] = *nav
+
+				// 	*nav = navigators[0]
+				// 	nav.IsActive = true
+				// }
+
+				nav.IsActive = false
+
+				if nav == leftNav {
+					leftNav.IsActive = false
+					nav = rightNav
 				} else {
-					activePane = 0
-					nav.IsActive = false
-					terminal.RenderOutput(nav, &selected)
-					navigators[1] = *nav
-
-					*nav = navigators[0]
-					nav.IsActive = true
+					rightNav.IsActive = false
+					nav = leftNav
 				}
+				nav.IsActive = true
 
-				terminal.RenderOutput(nav, &selected)
+				terminal.RenderOutput(leftNav, &selected)
+
+				terminal.RenderOutput(rightNav, &selected)
 			case menuKey:
 
 				go func() {
@@ -507,7 +538,11 @@ func navigate() {
 				config.ParseColorSchema(num, &terminal.CurrentTheme)
 				config.UpdateConfigFile(config.Cfg)
 
-				terminal.RenderOutput(nav, &selected)
+				terminal.PrintPane(2, 1, paneWidth)
+				terminal.PrintPane(2, paneWidth+1, paneWidth*2)
+				// terminal.RenderOutput(nav, &selected)
+				terminal.RenderOutput(leftNav, &selected)
+				terminal.RenderOutput(rightNav, &selected)
 
 			case execKey:
 				input := task.WaitInput("run command: ", "")
