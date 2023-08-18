@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	k "github.com/eiannone/keyboard"
@@ -81,8 +83,11 @@ var (
 	resumeNavigationChan = make(chan struct{}, 1)
 	taskDone             = make(chan func())
 	exit                 = make(chan bool, 1)
-	paneWidth            int
-	activePane           = 0
+	resizeChan           = make(chan os.Signal, 1)
+	doneResizing         = make(chan bool, 1)
+	resizeSignalReceived bool
+	// paneWidth            int
+	activePane = 0
 	// navigators           []navigator.Navigator
 	leftNav, rightNav, nav *navigator.Navigator
 	// nav, inactiveNav             *navigator.Navigator
@@ -93,30 +98,19 @@ var (
 func init() {
 	c.ParseConfigFile(c.Cfg)
 	c.ParseColorSchema(c.Cfg.CurrentSchema, &terminal.CurrentTheme)
+	terminal.SetLayout()
+	// paneWidth = terminal.GetPaneWidth()
 
-	paneWidth = terminal.GetPaneWidth()
-	//	nav = *navigator.NewNavigator()
 	leftNav = navigator.NewNavigator()
 	leftNav.StartCell = 2
-	leftNav.RowWidth = paneWidth - 2
+	leftNav.RowWidth = terminal.GetPaneWidth() - 2
 
 	nav = leftNav
 	nav.IsActive = true
-	// leftNav.IsActive = true
-	// nav.StartCell = 2
-	// nav.RowWidth = paneWidth - 2
-	rightNav = navigator.NewNavigator()
-	rightNav.StartCell = paneWidth + 2
-	rightNav.RowWidth = paneWidth - 2
 
-	// navigators = append(navigators, *navigator.NewNavigator())
-	// navigators[0].StartCell = 2
-	// navigators[0].RowWidth = paneWidth - 2
-	// nav = &navigators[0]
-	// nav.IsActive = true
-	// navigators = append(navigators, *navigator.NewNavigator())
-	// navigators[1].StartCell = paneWidth + 2
-	// navigators[1].RowWidth = paneWidth - 2
+	rightNav = navigator.NewNavigator()
+	rightNav.StartCell = terminal.GetPaneWidth() + 2
+	rightNav.RowWidth = terminal.GetPaneWidth() - 2
 
 	selected = *navigator.NewSelected()
 }
@@ -202,6 +196,8 @@ func showErrorAndTerminate(err error) {
 }
 
 func navigate() {
+	resizeSignalReceived = false
+
 	defer func() {
 		if r := recover(); r != nil {
 			terminal.ClearScreen()
@@ -216,8 +212,6 @@ func navigate() {
 		panic(err)
 	}
 	defer func() {
-		// terminal.ShowCursor()
-
 		err := k.Close()
 		//	fmt.Print("Closing keyboard")
 		if err != nil {
@@ -225,13 +219,58 @@ func navigate() {
 		}
 	}()
 
-	for keyListener {
-		//	task.StartTicker()
+	signal.Notify(resizeChan, syscall.SIGWINCH)
 
+	var once sync.Once
+
+	// go func() {
+	// 	for {
+	// 		once.Do(func() {
+	// 			// terminal.ClearScreen()
+
+	// 			<-resizeChan
+	// 			close(resizeChan)
+	// 			//	keyListener = false
+	// 			terminal.ClearScreen()
+
+	// 			// terminal.ClearScreen()
+	// 			// fmt.Println("Resizing")
+
+	// 			pause()
+
+	// 			go func() {
+	// 				doneResizing <- true
+	// 			}()
+	// 		})
+	// 	}
+	// }()
+
+	for keyListener {
 		select {
+
+		case <-resizeChan:
+
+			if resizeSignalReceived {
+				fmt.Print("received signal already continuing")
+				time.Sleep(time.Millisecond * 500)
+				continue
+			}
+
+			once.Do(func() {
+				resizeSignalReceived = true
+			})
+
+			// close(resizeChan)
+
+			pause()
+
+			go func() {
+				doneResizing <- true
+			}()
+
 		case <-pauseNavigation:
 			keyListener = false
-			//	fmt.Print("Pausing navigation")
+
 			break
 		case <-stopNavigation:
 			keyListener = false
@@ -244,10 +283,6 @@ func navigate() {
 			terminal.RenderOutput(nav, &selected)
 			if firstRender {
 
-				// navigators[1].Entries = append(navigators[1].Entries, nav.Entries...)
-				// navigators[1].DirSize = nav.DirSize
-				// navigators[1].CurrentPath = nav.CurrentPath
-				// navigators[1].RootPath = nav.RootPath
 				rightNav.Entries = append(rightNav.Entries, nav.Entries...)
 				rightNav.DirSize = nav.DirSize
 				rightNav.CurrentPath = nav.CurrentPath
@@ -275,24 +310,6 @@ func navigate() {
 
 			case switchPaneKey:
 
-				// if activePane == 0 {
-				// 	activePane = 1
-				// 	nav.IsActive = false
-				// 	terminal.RenderOutput(nav, &selected)
-				// 	navigators[0] = *nav
-				// 	*nav = navigators[1]
-				// 	nav.IsActive = true
-
-				// } else {
-				// 	activePane = 0
-				// 	nav.IsActive = false
-				// 	terminal.RenderOutput(nav, &selected)
-				// 	navigators[1] = *nav
-
-				// 	*nav = navigators[0]
-				// 	nav.IsActive = true
-				// }
-
 				nav.IsActive = false
 
 				if nav == leftNav {
@@ -308,15 +325,13 @@ func navigate() {
 
 				terminal.RenderOutput(rightNav, &selected)
 			case menuKey:
-
+				pause()
 				go func() {
 					terminal.ClearScreen()
 					terminal.PrintHelp()
 
-					resumeNavigation()
-					terminal.ResetFlushOutput(nav, &selected)
+					resume()
 				}()
-				pauseNavigation <- struct{}{}
 
 			case k.KeyCtrlC:
 				return
@@ -424,38 +439,29 @@ func navigate() {
 			case endKey:
 				if nav.HasEntries() {
 					nav.CurrentIndex = nav.GetEntriesLength() - 1
-					if nav.GetEntriesLength() < nav.NumVisibleLines {
-						nav.StartLine = 0
-					} else {
-						nav.StartLine = nav.GetEntriesLength() - nav.NumVisibleLines
-					}
+					terminal.RenderOutput(nav, &selected)
+
 				}
 
 			case pgDownKey:
 				if nav.HasEntries() {
-					terminal.ClearScreen()
-					if nav.GetEntriesLength() < nav.CurrentIndex+nav.NumVisibleLines {
-						nav.SetCurrentIndex(nav.GetEntriesLength() - 1)
-						nav.SetStartLine(nav.GetEntriesLength() - nav.NumVisibleLines)
+					if nav.CurrentIndex+terminal.OutputLines >= nav.GetEntriesLength() {
+						nav.CurrentIndex = nav.GetEntriesLength() - 1
 					} else {
-						nav.SetCurrentIndex(nav.CurrentIndex + nav.NumVisibleLines)
-						nav.SetStartLine(nav.CurrentIndex)
+						nav.CurrentIndex += terminal.OutputLines
 					}
-
 					terminal.RenderOutput(nav, &selected)
 				}
 
 			case pgUpKey:
 				if nav.HasEntries() {
-					if nav.GetCurrentIndex()-nav.NumVisibleLines < 0 {
-						nav.SetCurrentIndex(0)
-						nav.SetStartLine(0)
+					if nav.CurrentIndex-terminal.OutputLines < 0 {
+						nav.CurrentIndex = 0
 					} else {
-						nav.SetCurrentIndex(nav.CurrentIndex - nav.NumVisibleLines)
-						nav.SetStartLine(nav.CurrentIndex)
+						nav.CurrentIndex -= terminal.OutputLines
 					}
-
 					terminal.RenderOutput(nav, &selected)
+
 				}
 
 			case editKey:
@@ -545,8 +551,8 @@ func navigate() {
 				config.ParseColorSchema(num, &terminal.CurrentTheme)
 				config.UpdateConfigFile(config.Cfg)
 
-				terminal.PrintPane(2, 1, paneWidth)
-				terminal.PrintPane(2, paneWidth+1, paneWidth*2)
+				terminal.PrintPane(2, 1, terminal.GetPaneWidth())
+				terminal.PrintPane(2, terminal.GetPaneWidth()+1, terminal.GetPaneWidth()*2)
 
 				terminal.RenderOutput(leftNav, &selected)
 				terminal.RenderOutput(rightNav, &selected)
@@ -645,7 +651,7 @@ func pause() {
 	// fmt.Println("stopping navigation mode")
 	// time.Sleep(time.Second * 1)
 	pauseNavigation <- struct{}{}
-	time.Sleep(time.Millisecond * 50)
+	// time.Sleep(time.Millisecond * 50)
 }
 
 func resume() {
@@ -658,6 +664,8 @@ func resumeNavigation() {
 }
 
 func main() {
+	// signal.Notify(resizeChan, syscall.SIGWINCH)
+
 	terminal.ClearScreen()
 
 	terminal.PrintBanner()
@@ -666,15 +674,22 @@ func main() {
 
 	terminal.ClearScreen()
 
-	terminal.PrintPane(2, 1, paneWidth)
-	terminal.PrintPane(2, paneWidth+1, paneWidth*2)
-
+	terminal.PrintPane(2, 1, terminal.GetPaneWidth())
+	terminal.PrintPane(2, terminal.GetPaneWidth()+1, terminal.GetPaneWidth()*2)
+	// signal.Notify(resizeChan, syscall.SIGWINCH)
 	navigate()
 	for {
 		select {
 		case <-exit:
-
 			return
+
+		case <-doneResizing:
+
+			terminal.SetLayout()
+
+			//	terminal.ClearScreen()
+			// time.Sleep(time.Second * 1)
+			resume()
 		case <-resumeNavigationChan:
 			// fmt.Println("resume signal received")
 			// time.Sleep(time.Second * 1)
@@ -687,8 +702,12 @@ func main() {
 				// refresh(nav, &selected)
 				terminal.ClearScreen()
 				keyListener = true
-				terminal.PrintPane(2, 1, paneWidth)
-				terminal.PrintPane(2, paneWidth+1, paneWidth*2)
+				leftNav.StartCell = 2
+				leftNav.RowWidth = terminal.GetPaneWidth() - 2
+				rightNav.StartCell = terminal.GetPaneWidth() + 2
+				rightNav.RowWidth = terminal.GetPaneWidth() - 2
+				terminal.PrintPane(2, 1, terminal.GetPaneWidth())
+				terminal.PrintPane(2, terminal.GetPaneWidth()+1, terminal.GetPaneWidth()*2)
 				terminal.RenderOutput(leftNav, &selected)
 				terminal.RenderOutput(rightNav, &selected)
 

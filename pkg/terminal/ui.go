@@ -89,6 +89,18 @@ func PrintHelp() {
 
 	PrintBanner()
 
+	fmt.Println("terminal columns: ", GetNumVisibleCols())
+	fmt.Println("terminal lines: ", GetNumVisibleLines())
+	fmt.Println("output lines: ", OutputLines)
+	fmt.Println("output first line: ", OutputFirstLine)
+	fmt.Println("output last line: ", OutputLastLine)
+
+	_ = keyboard.Open()
+
+	defer func() {
+		_ = keyboard.Close()
+	}()
+
 	for {
 		_, key, err := keyboard.GetKey()
 		if err != nil {

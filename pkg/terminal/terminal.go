@@ -133,7 +133,7 @@ func GetNumVisibleLines() int {
 	return rows
 }
 
-func getNumVisibleCols() int {
+func GetNumVisibleCols() int {
 	_, cols := getNumVisibleRowsAndCols()
 
 	return cols
@@ -218,30 +218,28 @@ func ResetFlushOutput(n *navigator.Navigator, s *navigator.Selected) {
 }
 
 func RenderOutput(n *navigator.Navigator, s *navigator.Selected) {
-	// Cell(1, 1)
-	// printHeader(n.CurrentPath + Space + entry.PrintSizeAsString(*n.GetDirSize()))
-	// MoveCursorTop()
-	//	Cell(1, 1)
 	ClearRow(1, n.StartCell, n.RowWidth)
 	Cell(1, n.StartCell-1)
-	// clearCells(1, 1, getPaneWidth())
+
 	st := printHeader(n.CurrentPath + Space + entry.PrintSizeAsString(*n.GetDirSize()))
-	// fmt.Print(trimLine(st, n.RowWidth))
+
 	fmt.Print(st)
-	totalLines := GetNumVisibleLines()
-	// startLine := 3
-	currentRow := 3
-	lastRow := totalLines - 2
-	visibleRows := lastRow - currentRow
+	// totalLines := GetNumVisibleLines()
+
+	currentRow := OutputFirstLine
+	// lastRow := totalLines - 2
+	// 23
+	// visibleRows := lastRow - currentRow
 
 	var startIndex, endIndex int
 
-	if n.CurrentIndex > visibleRows {
-		startIndex = n.CurrentIndex - visibleRows
+	// 34 > 23
+	if n.CurrentIndex > OutputLines {
+		startIndex = n.CurrentIndex - OutputLines
 		endIndex = n.CurrentIndex
 	} else {
 		startIndex = 0
-		endIndex = lastRow - currentRow
+		endIndex = OutputLastLine - OutputFirstLine
 	}
 
 	var sep string
@@ -267,16 +265,14 @@ func RenderOutput(n *navigator.Navigator, s *navigator.Selected) {
 			} else {
 				output = printRow(sep, *n.GetEntry(i))
 			}
-			// fmt.Print(output)
+
 			fmt.Print(trimLine(output, n.RowWidth))
 
 			currentRow++
 		}
 
-		//		Cell(currentRow, n.StartCell)
-
 	}
-	Cell(lastRow+2, 1)
+	Cell(PromptLine, 1)
 	// Cell(GetNumVisibleLines(), 1)
 	// MoveCursorTop()
 	// n.NumVisibleLines = GetNumVisibleLines() - reserverdRows

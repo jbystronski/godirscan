@@ -7,17 +7,17 @@ import (
 
 const (
 	borderWidth   = 1
+	promptLines   = 1
+	headerLines   = 1
 	reserverdRows = 4
-	startRow      = 3
 )
 
-func PrintPane(line, startCol, endCol int) {
-	//	height := GetNumVisibleLines() - reserverdRows
+var paneWidth, OutputFirstLine, OutputLastLine, OutputLines, PromptLine int
 
-	// ClearScreen()
+func PrintPane(line, startCol, endCol int) {
 	Cell(line, startCol)
 	printTopBorder()
-	// Cell(8, 1)
+
 	for i := 3; i < GetNumVisibleLines(); i++ {
 		Cell(i, startCol)
 		printBorder()
@@ -29,11 +29,18 @@ func PrintPane(line, startCol, endCol int) {
 	}
 	Cell(line, startCol)
 	printBottomBorder()
-	// fmt.Print(colNumber)
 }
 
 func GetPaneWidth() int {
-	return (getNumVisibleCols() - 2*borderWidth) / 2
+	return paneWidth
+}
+
+func SetLayout() {
+	paneWidth = (GetNumVisibleCols() - 2*borderWidth) / 2
+	OutputFirstLine = headerLines + borderWidth + 1
+	OutputLastLine = GetNumVisibleLines() - promptLines - borderWidth
+	OutputLines = OutputLastLine - OutputFirstLine
+	PromptLine = OutputLastLine + borderWidth + 1
 }
 
 func printBorder() {
