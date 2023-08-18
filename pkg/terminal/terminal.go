@@ -102,11 +102,12 @@ func Cell(rowNumber, colNumber int) {
 	fmt.Printf("\033[%d;%dH", rowNumber, colNumber)
 }
 
-func trimLine(line *string, max int) {
-	if len(*line) > max {
-		*line = (*line)[:max-3]
-		*line += *line + "..."
+func trimLine(line string, max int) string {
+	if utf8.RuneCountInString(line) > max {
+		line = line[0:max]
+		//*line += *line + "..."
 	}
+	return fmt.Sprintf("%v%v", line, ResetFmt)
 }
 
 func ClearScreen() {
@@ -224,7 +225,9 @@ func RenderOutput(n *navigator.Navigator, s *navigator.Selected) {
 	ClearRow(1, n.StartCell, n.RowWidth)
 	Cell(1, n.StartCell-1)
 	// clearCells(1, 1, getPaneWidth())
-	printHeader(n.CurrentPath + Space + entry.PrintSizeAsString(*n.GetDirSize()))
+	st := printHeader(n.CurrentPath + Space + entry.PrintSizeAsString(*n.GetDirSize()))
+	// fmt.Print(trimLine(st, n.RowWidth))
+	fmt.Print(st)
 	totalLines := GetNumVisibleLines()
 	// startLine := 3
 	currentRow := 3
@@ -250,19 +253,22 @@ func RenderOutput(n *navigator.Navigator, s *navigator.Selected) {
 			currentRow++
 			continue
 		} else {
+
 			if i == n.GetEntriesLength()-1 {
 				sep = CornerLine + Hseparator
 			} else {
 				sep = TeeLine + Hseparator
 			}
-
+			var output string
 			if n.CurrentIndex == i && n.IsActive {
-				highlightRow(sep, *n.GetEntry(i))
+				output = highlightRow(sep, *n.GetEntry(i))
 			} else if _, ok := s.SelectedEntries[n.GetEntry(i)]; ok {
-				MarkRow(sep, *n.GetEntry(i))
+				output = MarkRow(sep, *n.GetEntry(i))
 			} else {
-				printRow(sep, *n.GetEntry(i))
+				output = printRow(sep, *n.GetEntry(i))
 			}
+			// fmt.Print(output)
+			fmt.Print(trimLine(output, n.RowWidth))
 
 			currentRow++
 		}
