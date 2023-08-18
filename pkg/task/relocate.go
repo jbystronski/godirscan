@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -23,17 +24,19 @@ var (
 	skipAll         bool
 )
 
-func writeFile(srcPath, srcName, targetPath string) {
-	newFilepath := filepath.Join(targetPath, srcName)
-
-	srcFile, err := os.Open(filepath.Join(srcPath, srcName))
+func writeFile(srcPath, targetPath string) {
+	srcFile, err := os.Open(srcPath)
 	if err != nil {
 		panic(err)
 	}
+	defer func() {
+		err := srcFile.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
 
-	defer srcFile.Close()
-
-	targetFile, err := os.Create(newFilepath)
+	targetFile, err := os.Create(targetPath)
 	if err != nil {
 		panic(err)
 	}
@@ -44,115 +47,126 @@ func writeFile(srcPath, srcName, targetPath string) {
 		panic(err)
 	}
 
-	info, err := os.Stat(filepath.Join(srcPath, srcName))
+	info, err := os.Stat(srcPath)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(0)
 
 	}
 
-	err = os.Chmod(newFilepath, info.Mode())
+	err = os.Chmod(targetPath, info.Mode())
 	if err != nil {
 		panic(err)
 	}
 }
 
-func move(srcPath, srcName, targetDir string, deleteCopied bool) {
-	srcInfo, err := os.Stat(filepath.Join(srcPath, srcName))
+func tryCreateSymlink(srcPath, targetPath string) bool {
+	fileInfo, err := os.Lstat(srcPath)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(0)
+		panic(err)
 	}
+	if fileInfo.Mode()&os.ModeSymlink != 0 {
+		symlinkTarget, linkErr := os.Readlink(srcPath)
 
-	if srcInfo.IsDir() {
-		proceed := true
-
-		err := os.Mkdir(filepath.Join(targetDir, srcName), srcInfo.Mode())
-		if err != nil {
-			if errors.Is(err, os.ErrExist) {
-
-				answ := WaitInput(fmt.Sprintf("%s %s %s", "Folder ", srcName, " already exists, do you wish to merge them?"), "y")
-
-				if answ == "y" || answ == strings.ToLower("YES") {
-					proceed = true
-				} else {
-					proceed = false
-				}
-
-			}
+		if linkErr != nil {
+			panic(linkErr)
 		}
 
-		if proceed {
+		symlinkErr := os.Symlink(symlinkTarget, targetPath)
+		if symlinkErr != nil {
+			panic(symlinkErr)
+		}
 
-			dc, err := os.ReadDir(filepath.Join(srcPath, srcName))
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+		return true
 
+	}
+	return false
+}
+
+func move(srcPath, targetPath string, deleteCopied bool) {
+	srcInfo, statErr := os.Stat(srcPath)
+	if statErr != nil {
+
+		wg.Add(1)
+
+		go func(statErr error, srcPath, targetPath string) {
+			defer func() {
+				wg.Done()
+			}()
+
+			ok := tryCreateSymlink(srcPath, targetPath)
+			<-sem
+
+			if !ok {
+				panic(statErr)
+			}
+		}(statErr, srcPath, targetPath)
+		sem <- struct{}{}
+
+	}
+
+	if statErr == nil {
+		if srcInfo.IsDir() {
+
+			createErr := os.Mkdir(targetPath, srcInfo.Mode())
+			if createErr != nil {
+				panic(createErr)
+			}
+			dc, readErr := os.ReadDir(srcPath)
+			if readErr != nil {
+				panic(readErr)
 			}
 
 			for _, entry := range dc {
-				move(filepath.Join(srcPath, srcName), entry.Name(), filepath.Join(targetDir, srcName), deleteCopied)
+				move(filepath.Join(srcPath, entry.Name()), filepath.Join(targetPath, entry.Name()), deleteCopied)
 			}
 
-		}
-
-		if deleteCopied {
-			err := os.RemoveAll(filepath.Join(srcPath, srcName))
-			if err != nil {
-				panic(err)
+			if deleteCopied {
+				removeErr := os.RemoveAll(srcPath)
+				if removeErr != nil {
+					panic(removeErr)
+				}
 			}
-		}
-
-	} else {
-
-		_, err := os.Stat(filepath.Join(targetDir, srcName))
-
-		if err != nil && errors.Is(err, os.ErrNotExist) {
-			wg.Add(1)
-			sem <- struct{}{}
-			go func(srcPath, srcName, targetDir string) {
-				defer func() {
-					wg.Done()
-					currentFileName <- fmt.Sprint("Written ", filepath.Join(targetDir, srcName), " ")
-					<-sem
-				}()
-
-				writeFile(srcPath, srcName, targetDir)
-			}(srcPath, srcName, targetDir)
-
 		} else {
+			wg.Add(1)
 
-			answ := WaitInput(fmt.Sprintf("%s %s %s", "File", srcName, " already exists, do you wish to overwrite it?"), "y")
-
-			if answ == "y" || answ == strings.ToLower("YES") {
-
-				wg.Add(1)
-				sem <- struct{}{}
-
-				go func(srcPath, srcName, targetDir string) {
-					defer func() {
-						wg.Done()
-						currentFileName <- fmt.Sprint("Written ", filepath.Join(targetDir, srcName), " ")
-						<-sem
-					}()
-
-					os.Remove(filepath.Join(targetDir, srcName))
-					writeFile(srcPath, srcName, targetDir)
-				}(srcPath, srcName, targetDir)
-
-			}
-
+			go func(srcPath, targetPath string) {
+				defer func(path string) {
+					wg.Done()
+					currentFileName <- fmt.Sprint("Finished writing ", path, " ")
+				}(targetPath)
+				currentFileName <- fmt.Sprint("Writing ", targetPath, " ")
+				writeFile(srcPath, targetPath)
+				<-sem
+			}(srcPath, targetPath)
+			sem <- struct{}{}
 		}
-
 	}
 }
 
-func Relocate(prompt string, deleteCopied bool, selected *navigator.Selected, nav *navigator.Navigator) {
-	answ := WaitInput(fmt.Sprintf("%s %s", prompt, "selected into the current directory? :"), "y")
+func addSuffixIfExists(targetPath string) string {
+	_, err := os.Stat(targetPath)
+	if err != nil {
+		return targetPath
+	}
+
+	for num := 1; ; num++ {
+		targetCopy := targetPath + " COPY " + strconv.Itoa(num)
+		_, err := os.Stat(targetCopy)
+		if err != nil {
+			return targetCopy
+		}
+	}
+}
+
+func Relocate(prompt string, deleteCopied bool, selected *navigator.Selected, currentPath string) (bool, error) {
+	answ, err := WaitInput(fmt.Sprintf("%s %s", prompt, "selected into the current directory? :"), "y")
+	if err != nil {
+		return false, err
+	}
 
 	if answ != "y" {
-		return
+		return false, nil
 	}
 
 	go func() {
@@ -161,28 +175,40 @@ func Relocate(prompt string, deleteCopied bool, selected *navigator.Selected, na
 
 	for entry := range selected.GetAll() {
 
-		if *entry.Path == nav.CurrentPath {
+		if *entry.Path == currentPath {
+			stopProgress <- struct{}{}
 			utils.ShowErrAndContinue(errors.New("copying / moving within same directory is not permitted"))
-			return
+
+			return false, nil
 		}
 
-		if strings.HasPrefix(nav.CurrentPath, entry.FullPath()) {
+		if strings.HasPrefix(currentPath, entry.FullPath()) {
+			stopProgress <- struct{}{}
 			utils.ShowErrAndContinue(errors.New("cannot move / copy a folder into itself"))
-			return
+
+			return false, nil
 		}
 
 		wg.Add(1)
-		go func(path string, name string, currentPath string) {
+		srcPath := filepath.Join(*entry.Path, entry.Name)
+
+		targetPath := addSuffixIfExists(filepath.Join(currentPath, entry.Name))
+		go func(srcPath, targetPath string) {
 			defer wg.Done()
 
-			move(path, name, currentPath, deleteCopied)
-		}(*entry.Path, entry.Name, nav.CurrentPath)
+			terminal.ClearLine()
+			terminal.CarriageReturn()
+
+			move(srcPath, targetPath, deleteCopied)
+		}(srcPath, targetPath)
 
 	}
 	wg.Wait()
 
+	terminal.ClearLine()
+	terminal.CarriageReturn()
 	stopProgress <- struct{}{}
-	// wg.Wait()
+	return true, nil
 
 	// TODO: after copying sort according to current sorting alghoritm
 }
