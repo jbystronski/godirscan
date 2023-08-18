@@ -1,6 +1,7 @@
 package task
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/user"
@@ -10,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/jbystronski/godirscan/pkg/entry"
+	"github.com/jbystronski/godirscan/pkg/utils"
 )
 
 func resolveUserDirectory(fPath *string) {
@@ -37,16 +39,29 @@ func resolveUserDirectory(fPath *string) {
 	}
 }
 
-func ScanInputDirectory(defaultDir string) (rootDir string, entries []*entry.Entry) {
-	fPath := WaitInput("Scan directory: ", defaultDir)
+func ScanInputDirectory(defaultDir string) (rootDir string, entries []*entry.Entry, err error) {
+	fPath, inputErr := WaitInput("Scan directory: ", defaultDir)
+	if inputErr != nil {
+		err = inputErr
+		return
+	}
+
+	if fPath == "" {
+		return
+	}
 
 	resolveUserDirectory(&fPath)
 
-	_, err := os.Stat(fPath)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-
+	_, statErr := os.Stat(fPath)
+	if statErr != nil {
+		if errors.Is(statErr, os.ErrNotExist) {
+			utils.ShowErrAndContinue(statErr)
+			return
+		} else {
+			fmt.Println("error is stat err")
+			err = statErr
+			return
+		}
 	}
 
 	rootPath := filepath.VolumeName("") + string(os.PathSeparator)

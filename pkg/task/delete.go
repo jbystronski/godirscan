@@ -12,8 +12,12 @@ import (
 	"github.com/jbystronski/godirscan/pkg/utils"
 )
 
-func DeleteSelected(selected *navigator.Selected, nav *navigator.Navigator) {
-	answ := WaitInput("Delete selected entries", "y")
+func DeleteSelected(selected *navigator.Selected, nav *navigator.Navigator) (ok bool, err error) {
+	answ, inputErr := WaitInput("Delete selected entries", "y")
+	if inputErr != nil {
+		err = inputErr
+		return
+	}
 
 	if answ == "y" {
 
@@ -35,14 +39,14 @@ func DeleteSelected(selected *navigator.Selected, nav *navigator.Navigator) {
 					currentFileName <- fmt.Sprint("Deleted ", en.Name, " ")
 				}()
 
-				err := os.RemoveAll(en.FullPath())
-				if err != nil {
-					if errors.Is(err, os.ErrPermission) {
+				removeErr := os.RemoveAll(en.FullPath())
+				if removeErr != nil {
+					if errors.Is(removeErr, os.ErrPermission) {
 						utils.ShowErrAndContinue(err)
-						return
 					} else {
-						fmt.Println(err)
-						os.Exit(1)
+						err = removeErr
+						return
+
 					}
 				}
 			}(key)
@@ -51,6 +55,8 @@ func DeleteSelected(selected *navigator.Selected, nav *navigator.Navigator) {
 		deleteGroup.Wait()
 
 		stopProgress <- struct{}{}
+		ok = true
 
 	}
+	return
 }

@@ -10,8 +10,16 @@ import (
 	"github.com/jbystronski/godirscan/pkg/utils"
 )
 
-func CreateFsFile(path string) (ok bool) {
-	name := WaitInput("Create a new file: ", "")
+func CreateFsFile(path string) (ok bool, err error) {
+	name, inputErr := WaitInput("Create a new file: ", "")
+	if inputErr != nil {
+		err = inputErr
+		return
+	}
+
+	if name == "" {
+		return
+	}
 
 	name = strings.TrimSpace(name)
 	if strings.ContainsAny(name, string(os.PathSeparator)) {
@@ -21,38 +29,38 @@ func CreateFsFile(path string) (ok bool) {
 	}
 	newFilePath := filepath.Join(path, name)
 
-	_, err := os.Stat(newFilePath)
+	_, statErr := os.Stat(newFilePath)
 
-	if err != nil && errors.Is(err, os.ErrNotExist) {
+	if statErr != nil && errors.Is(statErr, os.ErrNotExist) {
 
-		_, err := os.Create(newFilePath)
-		if err != nil {
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(0)
-			}
+		_, createErr := os.Create(newFilePath)
+		if createErr != nil {
+			utils.ShowErrAndContinue(err)
+			return
 		}
-
-		ok = true
 
 	} else {
 
-		name = WaitInput(fmt.Sprintf("%s (%s) %s", "File", name, "already exists, do you wish to override it?"), "n")
+		answ, inputErr := WaitInput(fmt.Sprintf("%s (%s) %s", "File", name, "already exists, do you wish to override it?"), "n")
 
-		if name == "y" || name == strings.ToLower("YES") {
+		if inputErr != nil {
+			return ok, inputErr
+		}
+
+		if answ == "y" || answ == strings.ToLower("YES") {
 			os.Truncate(newFilePath, 0)
-
-			ok = true
-
 		}
 
 	}
-
-	return
+	ok = true
+	return ok, nil
 }
 
-func CreateFsDirectory(path string) (ok bool) {
-	dir := WaitInput("Create directory: ", "")
+func CreateFsDirectory(path string) (ok bool, err error) {
+	dir, err := WaitInput("Create directory: ", "")
+	if err != nil {
+		return ok, err
+	}
 
 	dir = strings.TrimSpace(dir)
 	if strings.ContainsAny(dir, string(os.PathSeparator)) {
@@ -61,13 +69,11 @@ func CreateFsDirectory(path string) (ok bool) {
 		return
 	}
 	newDirPath := filepath.Join(path, dir)
-	err := os.Mkdir(newDirPath, 0o777)
+	err = os.Mkdir(newDirPath, 0o777)
 	if err != nil {
 		utils.ShowErrAndContinue(err)
 		return
 	}
-
 	ok = true
-
 	return
 }

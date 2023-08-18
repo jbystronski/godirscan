@@ -11,9 +11,15 @@ import (
 )
 
 func PromptFindByName(defaultPath string, entries []*entry.Entry, done chan<- struct{}) {
-	startPath := WaitInput("Find (in path): ", defaultPath)
+	startPath, err := WaitInput("Find (in path): ", defaultPath)
+	if err != nil {
+		panic(err)
+	}
 
-	pattern := WaitInput("Find (pattern): ", "")
+	pattern, err := WaitInput("Find (pattern): ", "")
+	if err != nil {
+		panic(err)
+	}
 
 	StartTicker()
 

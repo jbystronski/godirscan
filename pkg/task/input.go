@@ -3,13 +3,14 @@ package task
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/eiannone/keyboard"
 	k "github.com/eiannone/keyboard"
 	"github.com/jbystronski/godirscan/pkg/terminal"
 )
 
-func WaitInput(prompt, output string) string {
+func WaitInput(prompt, output string) (result string, err error) {
 	print := func(s string) {
 		terminal.ClearLine()
 		terminal.CarriageReturn()
@@ -36,23 +37,28 @@ func WaitInput(prompt, output string) string {
 	terminal.ClearLine()
 	print(output)
 
-	err := keyboard.Open()
+	err = keyboard.Open()
 	if err != nil {
 		panic(err)
+		return
 	}
 
 	defer func() {
-		err := k.Close()
-		if err != nil {
-			panic(err)
+		if keyboard.IsStarted(time.Millisecond * 10) {
+
+			err := k.Close()
+			if err != nil {
+				panic(err)
+			}
 		}
 	}()
 
 	for {
 
-		char, key, err := k.GetKey()
-		if err != nil {
-			panic(err)
+		char, key, getKeyErr := k.GetKey()
+		if getKeyErr != nil {
+			err = getKeyErr
+			return
 			//	os.Exit(1)
 		}
 
@@ -60,14 +66,14 @@ func WaitInput(prompt, output string) string {
 		case k.KeyEsc:
 			terminal.ClearLine()
 			terminal.CarriageReturn()
-			return ""
+			return
 
 		case k.KeyEnter:
 			terminal.ClearLine()
 			terminal.CarriageReturn()
-			output = strings.TrimSpace(output)
+			result = strings.TrimSpace(output)
 
-			return output
+			return
 
 		case k.KeyArrowRight:
 

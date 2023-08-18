@@ -30,7 +30,7 @@ func ExecuteDefault(path string) {
 		}
 	}
 	terminal.ClearScreen()
-	fmt.Println(terminal.CurrentTheme.Accent + "Command execution output (press esc to return): " + terminal.ResetFmt)
+	fmt.Println(terminal.CurrentTheme.Accent + "Ppress esc to return, command execution output: " + terminal.ResetFmt)
 	fmt.Println()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -41,6 +41,12 @@ func ExecuteDefault(path string) {
 		return
 	}
 
+	_ = k.Open()
+
+	defer func() {
+		k.Close()
+	}()
+
 	for {
 
 		_, key, err := k.GetKey()
@@ -50,7 +56,6 @@ func ExecuteDefault(path string) {
 		}
 
 		if key == k.KeyEsc {
-			terminal.ClearScreen()
 			return
 		}
 
@@ -63,6 +68,8 @@ func ExecCommand(input string) {
 	cmd := exec.Command(args[0], args[1:]...)
 	//	cmd.Stdin = os.Stdin
 	terminal.ClearScreen()
+	fmt.Println(terminal.CurrentTheme.Accent + "Press esc to return, command execution output: " + terminal.ResetFmt)
+	fmt.Println()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -71,8 +78,12 @@ func ExecCommand(input string) {
 		utils.ShowErrAndContinue(err)
 		return
 	}
-	fmt.Println(terminal.CurrentTheme.Accent + "Command output (press esc to return): " + terminal.ResetFmt)
-	fmt.Println()
+	_ = k.Open()
+
+	defer func() {
+		k.Close()
+	}()
+
 	for {
 
 		_, key, err := k.GetKey()
@@ -82,7 +93,7 @@ func ExecCommand(input string) {
 		}
 
 		if key == k.KeyEsc {
-			terminal.ClearScreen()
+			//	terminal.ClearScreen()
 			return
 		}
 
