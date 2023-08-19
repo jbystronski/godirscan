@@ -1,13 +1,14 @@
 package task
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
+
+	"github.com/jbystronski/godirscan/pkg/config"
 )
 
-func Edit(fPath, editor string) {
-	cmd := exec.Command(editor, fPath)
+func Edit(fPath string) error {
+	cmd := exec.Command(config.Cfg.DefaultEditor, fPath)
 
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -15,7 +16,7 @@ func Edit(fPath, editor string) {
 
 	err := cmd.Run()
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
+	return nil
 }

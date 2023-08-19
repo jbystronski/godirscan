@@ -12,5 +12,5 @@ func StopTicker() {
 
 func StartTicker() {
 	StopTicker()
-	Ticker = time.NewTicker(time.Millisecond * 400)
+	Ticker = time.NewTicker(time.Second * 2)
 }

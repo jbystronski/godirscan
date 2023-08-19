@@ -86,7 +86,7 @@ func printHelpers() {
 	Cell(totalLines, 2)
 	helper(op1)
 	helper(op2)
-	helper(op2)
+	helper(op3)
 }
 
 func PrintHelp() {

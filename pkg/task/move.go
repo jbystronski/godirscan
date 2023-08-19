@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/jbystronski/godirscan/pkg/config"
 	"github.com/jbystronski/godirscan/pkg/navigator"
@@ -24,37 +23,69 @@ var (
 	skipAll         bool
 )
 
-func writeFile(srcPath, targetPath string) error {
-	srcFile, err := os.Open(srcPath)
+func openFile(path string) (*os.File, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return file, nil
+}
+
+func copyFile(src, target *os.File) error {
+	_, err := io.Copy(target, src)
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func createFile(path string) (*os.File, error) {
+	file, err := os.Create(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return file, nil
+}
+
+func writeFile(srcPath, targetPath string) error {
+	srcFile, err := openFile(srcPath)
+	if err != nil {
+		panic(err)
+	}
+
+	targetFile, err := createFile(targetPath)
+	if err != nil {
+		panic(err)
+	}
+
 	defer func() {
 		err := srcFile.Close()
 		if err != nil {
 			panic(err)
 		}
+
+		err = targetFile.Close()
+		if err != nil {
+			panic(err)
+		}
 	}()
 
-	targetFile, err := os.Create(targetPath)
-	if err != nil {
-		return err
-	}
-	defer targetFile.Close()
+	err = copyFile(srcFile, targetFile)
 
-	_, err = io.Copy(targetFile, srcFile)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	info, err := os.Stat(srcPath)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	err = os.Chmod(targetPath, info.Mode())
 	if err != nil {
-		return err
+		panic(err)
 	}
 	return nil
 }
@@ -82,15 +113,7 @@ func tryCreateSymlink(srcPath, targetPath string) (bool, error) {
 	return false, nil
 }
 
-func remove(srcPath string) error {
-	removeErr := os.RemoveAll(srcPath)
-	if removeErr != nil {
-		return removeErr
-	}
-	return nil
-}
-
-func move(srcPath, targetPath string, deleteCopied bool) error {
+func move(srcPath, targetPath string) error {
 	var err error
 	var ok bool
 
@@ -109,13 +132,6 @@ func move(srcPath, targetPath string, deleteCopied bool) error {
 				return
 			}
 			<-sem
-
-			if deleteCopied {
-				err = remove(srcPath)
-				if err != nil {
-					return
-				}
-			}
 
 			if !ok {
 				err = statErr
@@ -139,18 +155,11 @@ func move(srcPath, targetPath string, deleteCopied bool) error {
 			}
 
 			for _, entry := range dc {
-				err = move(filepath.Join(srcPath, entry.Name()), filepath.Join(targetPath, entry.Name()), deleteCopied)
+				err = move(filepath.Join(srcPath, entry.Name()), filepath.Join(targetPath, entry.Name()))
 				if err != nil {
 					return err
 				}
 
-			}
-
-			if deleteCopied {
-				err = remove(srcPath)
-				if err != nil {
-					return err
-				}
 			}
 
 		} else {
@@ -163,17 +172,6 @@ func move(srcPath, targetPath string, deleteCopied bool) error {
 				}(targetPath)
 				currentFileName <- fmt.Sprint("Writing ", targetPath, " ")
 				err = writeFile(srcPath, targetPath)
-
-				if err != nil {
-					return
-				}
-
-				if deleteCopied {
-					err = remove(srcPath)
-					if err != nil {
-						return
-					}
-				}
 
 				<-sem
 			}(srcPath, targetPath)
@@ -231,12 +229,21 @@ func Relocate(prompt string, deleteCopied bool, selected *navigator.Selected, cu
 
 		targetPath := addSuffixIfExists(filepath.Join(currentPath, entry.Name))
 		go func(srcPath, targetPath string) {
-			defer wg.Done()
+			defer func() {
+				if deleteCopied {
+					err = os.RemoveAll(srcPath)
+					if err != nil {
+						panic(err)
+					}
+				}
+
+				wg.Done()
+			}()
 
 			terminal.ClearLine()
 			terminal.CarriageReturn()
 
-			err = move(srcPath, targetPath, deleteCopied)
+			err = move(srcPath, targetPath)
 			if err != nil {
 				panic(err)
 			}
@@ -244,8 +251,7 @@ func Relocate(prompt string, deleteCopied bool, selected *navigator.Selected, cu
 
 	}
 	wg.Wait()
-	fmt.Println("FINISHED WAITGROUP")
-	time.Sleep(time.Second * 2)
+
 	terminal.ClearLine()
 	terminal.CarriageReturn()
 	stopProgress <- struct{}{}

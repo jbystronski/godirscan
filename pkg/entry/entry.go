@@ -110,38 +110,3 @@ func (e Entry) PrintSize() string {
 func PrintSizeAsString(size int) string {
 	return fmt.Sprintf("%v", "["+FormatSize(size)+"]")
 }
-
-// func (e EntryChild) PrintPath(i int) string {
-// 	fmtPath := ""
-
-// 	if e.IsDir {
-// 		fmtPath = fmtDir + e.Parent.Path + e.Name + terminal.ResetFmt
-// 	} else {
-// 		fmtPath = fmtDir + e.Parent.Path + fmtFile + e.Name + terminal.ResetFmt
-// 	}
-
-// 	return fmt.Sprintf("%s %v [%d]", fmtPath, formatSize(e.Size), i)
-// }
-
-// func (e Entry) String() string {
-// 	indentParts := strings.Split(e.Pattern, "")
-// 	format := ""
-// 	for i, indent := range indentParts {
-// 		if i == len(indentParts)-1 {
-// 			if indent == "0" {
-// 				format += terminal.CornerLine + terminal.Hseparator
-// 			} else {
-// 				format += terminal.TeeLine + terminal.Hseparator
-// 			}
-// 		} else {
-// 			if indent == "0" {
-// 				format += terminal.EmptyIndent
-// 			} else {
-// 				format += terminal.Vseparator + terminal.EmptyIndent
-// 			}
-// 		}
-// 	}
-
-// 	nameFmt := ""
-
-// 	if e.IsDir {

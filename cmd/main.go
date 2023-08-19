@@ -112,6 +112,12 @@ func init() {
 	selected = *navigator.NewSelected()
 }
 
+func resetCalculation() {
+	task.StopTicker()
+	nav.DirSize = 0
+	// sizeCalculationDone <- struct{}{}
+}
+
 func enterSubfolder(nav *navigator.Navigator, selected *navigator.Selected) {
 	if nav.HasEntries() && nav.GetCurrentEntry().IsDir {
 
@@ -125,7 +131,7 @@ func enterSubfolder(nav *navigator.Navigator, selected *navigator.Selected) {
 			nav.CurrentIndex = 0
 			terminal.ResetFlushOutput(nav, selected)
 		} else {
-
+			resetCalculation()
 			newPath, newEntries, err := task.ScanDirectory(p)
 			if err != nil {
 				terminal.FlashError(err)
@@ -338,6 +344,7 @@ func navigate() {
 					terminal.RenderOutput(nav, &selected)
 
 				} else {
+					resetCalculation()
 
 					newPath, newEntries, err := task.ScanDirectory(nav.GetParentPath())
 					if err != nil {
@@ -534,7 +541,10 @@ func navigate() {
 
 					for _, dirEntry := range dc {
 
-						info, _ := dirEntry.Info()
+						info, err := dirEntry.Info()
+						if err != nil {
+							return err
+						}
 
 						if info.IsDir() {
 							find(filepath.Join(path, info.Name()), reg, min, max, entries)
@@ -688,9 +698,23 @@ func navigate() {
 
 						terminal.ClearScreen()
 						sizeBefore := nav.GetCurrentEntry().Size
-						task.Edit(nav.GetCurrentEntry().FullPath(), c.Cfg.DefaultEditor)
+						err := task.Edit(nav.GetCurrentEntry().FullPath())
+						if err != nil {
 
-						info, _ := os.Stat(nav.GetCurrentEntry().FullPath())
+							terminal.FlashError(err)
+							time.Sleep(time.Second * 2)
+							rerender()
+							continue
+						}
+
+						info, err := os.Stat(nav.GetCurrentEntry().FullPath())
+						if err != nil {
+
+							terminal.FlashError(err)
+							time.Sleep(time.Second * 2)
+							rerender()
+							continue
+						}
 
 						if info.Size() != int64(sizeBefore) {
 							refresh(nav, &selected)
@@ -709,6 +733,7 @@ func navigate() {
 					if err != nil {
 						terminal.FlashError(err)
 						time.Sleep(time.Second * 2)
+
 					}
 
 					if ok {

@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"fmt"
+	"os"
 	"time"
 )
 
@@ -17,4 +18,18 @@ func FlashError(err error) {
 		printHelpers()
 		return
 	}()
+}
+
+func HandleError(err error) {
+	switch err {
+
+	case os.ErrPermission:
+
+	case os.ErrNotExist:
+
+	case os.ErrExist:
+
+	default:
+
+	}
 }
