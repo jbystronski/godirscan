@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jbystronski/godirscan/pkg/utils"
+	"github.com/jbystronski/godirscan/pkg/terminal"
 )
 
-func CreateFsFile(path string) (ok bool, err error) {
-	name, inputErr := WaitInput("Create a new file: ", "")
+func CreateFsFile(path string, offset int) (ok bool, err error) {
+	name, inputErr := WaitInput("Create a new file: ", "", terminal.PromptLine, offset)
 	if inputErr != nil {
 		err = inputErr
 		return
@@ -23,7 +23,7 @@ func CreateFsFile(path string) (ok bool, err error) {
 
 	name = strings.TrimSpace(name)
 	if strings.ContainsAny(name, string(os.PathSeparator)) {
-		utils.ShowErrAndContinue(fmt.Errorf("%s: %v", "filename contains path separator, aborting", os.PathSeparator))
+		err = fmt.Errorf("%s: %v", "filename contains path separator, aborting", os.PathSeparator)
 
 		return
 	}
@@ -35,13 +35,12 @@ func CreateFsFile(path string) (ok bool, err error) {
 
 		_, createErr := os.Create(newFilePath)
 		if createErr != nil {
-			utils.ShowErrAndContinue(err)
-			return
+			return false, createErr
 		}
 
 	} else {
 
-		answ, inputErr := WaitInput(fmt.Sprintf("%s (%s) %s", "File", name, "already exists, do you wish to override it?"), "n")
+		answ, inputErr := WaitInput(fmt.Sprintf("%s (%s) %s", "File", name, "already exists, do you wish to override it?"), "n", terminal.PromptLine, offset)
 
 		if inputErr != nil {
 			return ok, inputErr
@@ -56,22 +55,25 @@ func CreateFsFile(path string) (ok bool, err error) {
 	return ok, nil
 }
 
-func CreateFsDirectory(path string) (ok bool, err error) {
-	dir, err := WaitInput("Create directory: ", "")
+func CreateFsDirectory(path string, offset int) (ok bool, err error) {
+	dir, err := WaitInput("Create directory: ", "", terminal.PromptLine, offset)
 	if err != nil {
 		return ok, err
 	}
 
+	if dir == "" {
+		return
+	}
+
 	dir = strings.TrimSpace(dir)
 	if strings.ContainsAny(dir, string(os.PathSeparator)) {
-		utils.ShowErrAndContinue(fmt.Errorf("%s \"%v\"", "Folder name cannot contain", string(os.PathSeparator)))
+		err = fmt.Errorf("%s \"%v\"", "Folder name cannot contain", string(os.PathSeparator))
 
 		return
 	}
 	newDirPath := filepath.Join(path, dir)
 	err = os.Mkdir(newDirPath, 0o777)
 	if err != nil {
-		utils.ShowErrAndContinue(err)
 		return
 	}
 	ok = true

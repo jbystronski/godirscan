@@ -6,19 +6,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jbystronski/godirscan/pkg/utils"
+	"github.com/jbystronski/godirscan/pkg/terminal"
 )
 
-func Rename(currentName, pathToFile string) (bool, error) {
-	answ, err := WaitInput("rename", currentName)
+func Rename(currentName, pathToFile string, offset int) (bool, error) {
+	answ, err := WaitInput("rename", currentName, terminal.PromptLine, offset)
 	if err != nil {
 		return false, err
 	}
 
 	if strings.Contains(answ, string(os.PathSeparator)) {
-		utils.ShowErrAndContinue(fmt.Errorf("path separator can't be used inside name"))
-		return false, nil
-
+		return false, fmt.Errorf("path separator can't be used inside name")
 	}
 
 	if answ == "" || answ == currentName {

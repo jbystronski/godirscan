@@ -9,7 +9,6 @@ import (
 
 	k "github.com/eiannone/keyboard"
 	"github.com/jbystronski/godirscan/pkg/terminal"
-	"github.com/jbystronski/godirscan/pkg/utils"
 )
 
 func ExecuteDefault(path string) {
@@ -37,15 +36,14 @@ func ExecuteDefault(path string) {
 
 	err := cmd.Run()
 	if err != nil {
-		utils.ShowErrAndContinue(err)
 		return
 	}
 
-	_ = k.Open()
+	// _ = k.Open()
 
-	defer func() {
-		k.Close()
-	}()
+	// defer func() {
+	// 	k.Close()
+	// }()
 
 	for {
 
@@ -64,6 +62,9 @@ func ExecuteDefault(path string) {
 
 func ExecCommand(input string) {
 	args := strings.Fields(input)
+	if len(args) == 0 {
+		return
+	}
 
 	cmd := exec.Command(args[0], args[1:]...)
 	//	cmd.Stdin = os.Stdin
@@ -75,14 +76,13 @@ func ExecCommand(input string) {
 
 	err := cmd.Run()
 	if err != nil {
-		utils.ShowErrAndContinue(err)
 		return
 	}
-	_ = k.Open()
+	// _ = k.Open()
 
-	defer func() {
-		k.Close()
-	}()
+	// defer func() {
+	// 	k.Close()
+	// }()
 
 	for {
 

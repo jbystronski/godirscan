@@ -2,7 +2,6 @@ package task
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -11,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/jbystronski/godirscan/pkg/entry"
-	"github.com/jbystronski/godirscan/pkg/utils"
 )
 
 func resolveUserDirectory(fPath *string) {
@@ -39,8 +37,8 @@ func resolveUserDirectory(fPath *string) {
 	}
 }
 
-func ScanInputDirectory(defaultDir string) (rootDir string, entries []*entry.Entry, err error) {
-	fPath, inputErr := WaitInput("Scan directory: ", defaultDir)
+func ScanInputDirectory(defaultDir string, offsetRow, offsetCol int) (rootDir string, entries []*entry.Entry, err error) {
+	fPath, inputErr := WaitInput("Scan directory: ", defaultDir, offsetRow, offsetCol)
 	if inputErr != nil {
 		err = inputErr
 		return
@@ -54,14 +52,10 @@ func ScanInputDirectory(defaultDir string) (rootDir string, entries []*entry.Ent
 
 	_, statErr := os.Stat(fPath)
 	if statErr != nil {
-		if errors.Is(statErr, os.ErrNotExist) {
-			utils.ShowErrAndContinue(statErr)
-			return
-		} else {
-			fmt.Println("error is stat err")
-			err = statErr
-			return
-		}
+
+		err = statErr
+		return
+
 	}
 
 	rootPath := filepath.VolumeName("") + string(os.PathSeparator)
@@ -72,38 +66,32 @@ func ScanInputDirectory(defaultDir string) (rootDir string, entries []*entry.Ent
 		fPath = strings.TrimSuffix(fPath, string(os.PathSeparator))
 	}
 
-	rootDir, entries = ScanDirectory(fPath)
+	rootDir, entries, err = ScanDirectory(fPath)
 
 	return
 }
 
-func ScanDirectory(path string) (string, []*entry.Entry) {
+func ScanDirectory(path string) (string, []*entry.Entry, error) {
 	allEntries := []*entry.Entry{}
 
 	info, err := os.Stat(path)
 	if err != nil {
-		fmt.Println("error during os.stat: ", err)
+		return "", nil, err
 	}
 
 	if !info.IsDir() {
-
-		fmt.Println("error occcured")
-		return "", nil
+		return "", nil, errors.New("Path is not a directory")
 	}
 
 	dc, err := os.ReadDir(path)
 	if err != nil {
-
-		fmt.Println("error occured")
-		return "", nil
+		return "", nil, err
 	}
 
 	for _, en := range dc {
 
 		info, err := os.Lstat(filepath.Join(path, en.Name()))
 		if err != nil {
-
-			fmt.Println("error occurred")
 			continue
 		}
 
@@ -128,7 +116,7 @@ func ScanDirectory(path string) (string, []*entry.Entry) {
 		allEntries = append(allEntries, newEntry)
 	}
 
-	return path, allEntries
+	return path, allEntries, nil
 }
 
 var virtualFsMap = map[string]struct{}{

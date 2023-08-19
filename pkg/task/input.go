@@ -3,17 +3,16 @@ package task
 import (
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/eiannone/keyboard"
 	k "github.com/eiannone/keyboard"
 	"github.com/jbystronski/godirscan/pkg/terminal"
 )
 
-func WaitInput(prompt, output string) (result string, err error) {
+func WaitInput(prompt, output string, offsetRow, offsetCol int) (result string, err error) {
 	print := func(s string) {
-		terminal.ClearLine()
-		terminal.CarriageReturn()
+		// terminal.ClearLine()
+		// terminal.CarriageReturn()
+		terminal.Cell(offsetRow, offsetCol)
 		fmt.Print(terminal.Prompt(prompt) + " " + s)
 	}
 
@@ -34,24 +33,24 @@ func WaitInput(prompt, output string) (result string, err error) {
 	// promptLength := fmt.Sprint(len(prompt))
 	cursorPosition := len(output)
 
-	terminal.ClearLine()
+	// terminal.ClearLine()
 	print(output)
 
-	err = keyboard.Open()
-	if err != nil {
-		panic(err)
-		return
-	}
+	// err = keyboard.Open()
+	// if err != nil {
+	// 	panic(err)
+	// 	return
+	// }
 
-	defer func() {
-		if keyboard.IsStarted(time.Millisecond * 10) {
+	// defer func() {
+	// 	// fmt.Print("closing keyboard inside input")
 
-			err := k.Close()
-			if err != nil {
-				panic(err)
-			}
-		}
-	}()
+	// 	err := k.Close()
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// 	// time.Sleep(time.Millisecond * 400)
+	// }()
 
 	for {
 
@@ -90,7 +89,7 @@ func WaitInput(prompt, output string) (result string, err error) {
 			if len(output) > 0 {
 
 				output = output[0:cursorPosition-1] + output[cursorPosition:]
-				terminal.ClearLine()
+				terminal.ClearRow(terminal.PromptLine, terminal.PromptLine+len(output), 1)
 				cursorPosition--
 
 				print(output)

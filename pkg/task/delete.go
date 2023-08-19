@@ -9,11 +9,10 @@ import (
 	"github.com/jbystronski/godirscan/pkg/entry"
 	"github.com/jbystronski/godirscan/pkg/navigator"
 	"github.com/jbystronski/godirscan/pkg/terminal"
-	"github.com/jbystronski/godirscan/pkg/utils"
 )
 
 func DeleteSelected(selected *navigator.Selected, nav *navigator.Navigator) (ok bool, err error) {
-	answ, inputErr := WaitInput("Delete selected entries", "y")
+	answ, inputErr := WaitInput("Delete selected entries", "y", terminal.PromptLine, nav.StartCell)
 	if inputErr != nil {
 		err = inputErr
 		return
@@ -42,7 +41,9 @@ func DeleteSelected(selected *navigator.Selected, nav *navigator.Navigator) (ok 
 				removeErr := os.RemoveAll(en.FullPath())
 				if removeErr != nil {
 					if errors.Is(removeErr, os.ErrPermission) {
-						utils.ShowErrAndContinue(err)
+						err = removeErr
+						return
+
 					} else {
 						err = removeErr
 						return
