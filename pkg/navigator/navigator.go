@@ -10,16 +10,16 @@ import (
 
 type Navigator struct {
 	NumVisibleLines, DirSize, CurrentIndex int
-	StartLine, EndLine                     int
-	StartCell                              int
-	RowWidth                               int
-	SortMode                               uint8
-	Entries                                []*entry.Entry
-	backTrace                              []int
-	CurrentPath, RootPath                  string
-	ActiveRowIndex                         int
-	ActiveRowText                          string
-	IsActive                               bool
+
+	StartCell             int
+	RowWidth              int
+	SortMode              uint8
+	Entries               []*entry.Entry
+	backTrace             []int
+	CurrentPath, RootPath string
+	ActiveRowIndex        int
+	ActiveRowText         string
+	IsActive              bool
 }
 
 func NewNavigator() *Navigator {
@@ -54,28 +54,12 @@ func (n *Navigator) HasEntries() bool {
 	return n.GetEntriesLength() > 0
 }
 
-func (n *Navigator) GetEndLine() int {
-	return n.EndLine
-}
-
 func (n *Navigator) GetCurrentIndex() int {
 	return n.CurrentIndex
 }
 
 func (n *Navigator) SetCurrentIndex(i int) {
 	n.CurrentIndex = i
-}
-
-func (n *Navigator) SetEndLine(i int) {
-	n.EndLine = i
-}
-
-func (n *Navigator) GetStartLine() int {
-	return n.StartLine
-}
-
-func (n *Navigator) SetStartLine(i int) {
-	n.StartLine = i
 }
 
 func (n *Navigator) GetDirSize() *int {
@@ -114,18 +98,10 @@ func (n *Navigator) GetEntry(index int) *entry.Entry {
 	return n.Entries[index]
 }
 
-func (n *Navigator) Reset() {
-	n.SetCurrentIndex(0)
-	n.SetStartLine(0)
-	n.SetEndLine(0)
-}
-
 func (n *Navigator) MoveDown() (ok bool) {
 	if n.GetEntriesLength() > 0 && n.CurrentIndex < n.GetEntriesLength()-1 {
 		n.CurrentIndex++
-		if n.CurrentIndex >= n.StartLine+n.NumVisibleLines {
-			n.StartLine++
-		}
+
 		ok = true
 
 	}
@@ -135,9 +111,6 @@ func (n *Navigator) MoveDown() (ok bool) {
 func (n *Navigator) MoveUp() (ok bool) {
 	if n.HasEntries() && n.CurrentIndex > 0 {
 		n.CurrentIndex--
-		if n.CurrentIndex < n.StartLine {
-			n.StartLine--
-		}
 
 		ok = true
 	}
