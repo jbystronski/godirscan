@@ -10,8 +10,6 @@ import (
 
 func PrintEmpty() {
 	fmt.Printf("%s%s", "folder is empty", ResetFmt)
-	// moveToEndOfLine()
-	// printBorder()
 }
 
 func Prompt(prompt string) string {
@@ -20,16 +18,10 @@ func Prompt(prompt string) string {
 
 func highlightRow(sep string, en entry.Entry) string {
 	return fmt.Sprintf("%s%s%s%s%s\n", CurrentTheme.BgHighlight, CurrentTheme.Highlight+BoldFmt, sep, en.Name+Space+en.PrintSize(), ResetFmt)
-
-	// moveToEndOfLine()
-	// printBorder()
 }
 
 func MarkRow(sep string, en entry.Entry) string {
 	return fmt.Sprintf("%s%s%s%s%s\n", CurrentTheme.BgSelect, CurrentTheme.Select+BoldFmt, sep, en.Name+Space+en.PrintSize(), ResetFmt)
-	// printRightBorder()
-	// moveToEndOfLine()
-	// printBorder()
 }
 
 func printRow(sep string, entry entry.Entry) string {
@@ -38,8 +30,6 @@ func printRow(sep string, entry entry.Entry) string {
 	} else {
 		return fmt.Sprintf("%s%s%s\n", strings.Join([]string{ColorsMap["bright_white"], sep, CurrentTheme.Accent, entry.Name, BoldFmt, ColorsMap["bright_white"], Space}, ""), entry.PrintSize(), ResetFmt)
 	}
-
-	// printRightBorder()
 }
 
 func r(s string, times int) string {
@@ -69,7 +59,7 @@ func PrintBanner() {
 }
 
 func printHeader(header string) string {
-	return fmt.Sprintf("%s%s", CurrentTheme.BgHeader+CurrentTheme.Header+" F2 - options "+Space+header, ResetFmt)
+	return fmt.Sprintf("%s%s", CurrentTheme.BgHeader+CurrentTheme.Header+header, ResetFmt)
 }
 
 // func printOptions(options []Option) {
@@ -82,24 +72,41 @@ func printHeader(header string) string {
 // 	w.Flush()
 // }
 
+func printHelpers() {
+	helper := func(s string) {
+		fmt.Printf("%v%v%s%v%s%v%v%s", BoldFmt, CurrentTheme.BgHeader, Space, ColorsMap["bright_white"], s, Space, ResetFmt, Space)
+	}
+
+	const (
+		op1 string = "F2 - Help"
+		op2        = "Ctrl M - Match"
+		op3        = "Esc - Quit"
+	)
+
+	Cell(totalLines, 2)
+	helper(op1)
+	helper(op2)
+	helper(op2)
+}
+
 func PrintHelp() {
 	//for i, s := range selected {
 	//	fmt.Printf("%d - %s", i, s)
 	//}
 
 	PrintBanner()
-
+	fmt.Println("total lines: ", totalLines)
 	fmt.Println("terminal columns: ", GetNumVisibleCols())
-	fmt.Println("terminal lines: ", GetNumVisibleLines())
+
 	fmt.Println("output lines: ", OutputLines)
 	fmt.Println("output first line: ", OutputFirstLine)
 	fmt.Println("output last line: ", OutputLastLine)
 
-	_ = keyboard.Open()
+	// _ = keyboard.Open()
 
-	defer func() {
-		_ = keyboard.Close()
-	}()
+	// defer func() {
+	// 	_ = keyboard.Close()
+	// }()
 
 	for {
 		_, key, err := keyboard.GetKey()
@@ -114,7 +121,4 @@ func PrintHelp() {
 	}
 
 	// printOptions(optionsList)
-}
-
-func printBox(totalLines, totalCols, boxWidth, boxHeight int) {
 }

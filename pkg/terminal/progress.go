@@ -2,8 +2,6 @@ package terminal
 
 import (
 	"fmt"
-	"strings"
-	"time"
 )
 
 func PrintProgress(stop <-chan struct{}, msg <-chan string) {
@@ -35,11 +33,12 @@ func PrintProgress(stop <-chan struct{}, msg <-chan string) {
 				currStage++
 			}
 
-			ClearLine()
-			CarriageReturn()
+			Cell(totalLines, 1)
+			// ClearLine()
+			// CarriageReturn()
 			fmt.Print(output)
-			time.Sleep(time.Millisecond * 100)
-			fmt.Print(strings.Repeat(CursorLeft, len(output)))
+			//	time.Sleep(time.Millisecond * 100)
+			// fmt.Print(strings.Repeat(CursorLeft, len(output)))
 			output = ""
 
 		}

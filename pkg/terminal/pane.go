@@ -6,29 +6,53 @@ import (
 )
 
 const (
-	borderWidth   = 1
-	promptLines   = 1
-	headerLines   = 1
-	reserverdRows = 4
+	borderWidth      = 1
+	helperLineHeight = 1
+	promptLineHeight = 1
+	headerLineHeight = 1
+	reserverdRows    = 4
 )
 
-var paneWidth, OutputFirstLine, OutputLastLine, OutputLines, PromptLine int
+var paneWidth, OutputWidth, helperLine, topBorderLine, bottomBorderLine, OutputFirstLine, OutputLastLine, OutputLines, PromptLine, totalLines int
 
-func PrintPane(line, startCol, endCol int) {
-	Cell(line, startCol)
+func printLeftPane() {
+	PrintPane(1, paneWidth)
+}
+
+func printRightPane() {
+	PrintPane(paneWidth+1, paneWidth*2)
+}
+
+func PrintPane(startCol, endCol int) {
+	Cell(topBorderLine, startCol)
 	printTopBorder()
-
-	for i := 3; i < GetNumVisibleLines(); i++ {
-		Cell(i, startCol)
-		printBorder()
-
-		Cell(i, endCol)
-		printBorder()
-		fmt.Print("\n")
-		line++
-	}
-	Cell(line, startCol)
+	Cell(bottomBorderLine, startCol)
 	printBottomBorder()
+
+	currentRow := OutputFirstLine
+
+	for currentRow <= OutputLastLine {
+		Cell(currentRow, startCol)
+		printBorder()
+
+		Cell(currentRow, endCol)
+		printBorder()
+
+		currentRow++
+	}
+	Cell(currentRow, startCol)
+	printBorder()
+	Cell(currentRow, endCol)
+	printBorder()
+	// Cell(currentRow, startCol+1)
+	// fmt.Print("Prompt")
+}
+
+func PrintPanes() {
+	printLeftPane()
+	printRightPane()
+	Cell(helperLine, 1)
+	printHelpers()
 }
 
 func GetPaneWidth() int {
@@ -36,11 +60,20 @@ func GetPaneWidth() int {
 }
 
 func SetLayout() {
+	totalLines = GetNumVisibleLines()
 	paneWidth = (GetNumVisibleCols() - 2*borderWidth) / 2
-	OutputFirstLine = headerLines + borderWidth + 1
-	OutputLastLine = GetNumVisibleLines() - promptLines - borderWidth
+
+	OutputFirstLine = headerLineHeight + borderWidth + 1
+	OutputLastLine = totalLines - helperLineHeight - borderWidth - promptLineHeight
+
+	//	OutputLines = TotalLines - headerLineHeight - borderWidth - promptLineHeight - borderWidth - helperLineHeight
 	OutputLines = OutputLastLine - OutputFirstLine
-	PromptLine = OutputLastLine + borderWidth + 1
+
+	PromptLine = totalLines - 2
+	topBorderLine = 2
+	bottomBorderLine = totalLines - 1
+	OutputWidth = paneWidth - 2
+	helperLine = totalLines
 }
 
 func printBorder() {
@@ -48,9 +81,9 @@ func printBorder() {
 }
 
 func printTopBorder() {
-	fmt.Printf("%v%s%s%s%v\n", CurrentTheme.Main, topLeftBorderCorner, strings.Repeat(borderHorizontal, GetPaneWidth()-2), topRightBorderCorner, ResetFmt)
+	fmt.Printf("%v%s%s%s%v\n", CurrentTheme.Main, topLeftBorderCorner, strings.Repeat(borderHorizontal, paneWidth-2), topRightBorderCorner, ResetFmt)
 }
 
 func printBottomBorder() {
-	fmt.Printf("%v%s%s%s%v\n", CurrentTheme.Main, bottomLeftBorderCorner, strings.Repeat(borderHorizontal, GetPaneWidth()-2), bottomRightBorderCorner, ResetFmt)
+	fmt.Printf("%v%s%s%s%v\n", CurrentTheme.Main, bottomLeftBorderCorner, strings.Repeat(borderHorizontal, paneWidth-2), bottomRightBorderCorner, ResetFmt)
 }

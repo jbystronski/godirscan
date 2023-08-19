@@ -213,7 +213,7 @@ func ResetFlushOutput(n *navigator.Navigator, s *navigator.Selected) {
 	printHeader(n.CurrentPath + Space + entry.PrintSizeAsString(*n.GetDirSize()))
 
 	//	ClearScreen()
-	n.Reset()
+
 	RenderOutput(n, s)
 }
 
@@ -224,16 +224,11 @@ func RenderOutput(n *navigator.Navigator, s *navigator.Selected) {
 	st := printHeader(n.CurrentPath + Space + entry.PrintSizeAsString(*n.GetDirSize()))
 
 	fmt.Print(st)
-	// totalLines := GetNumVisibleLines()
 
 	currentRow := OutputFirstLine
-	// lastRow := totalLines - 2
-	// 23
-	// visibleRows := lastRow - currentRow
 
 	var startIndex, endIndex int
 
-	// 34 > 23
 	if n.CurrentIndex > OutputLines {
 		startIndex = n.CurrentIndex - OutputLines
 		endIndex = n.CurrentIndex
@@ -271,44 +266,12 @@ func RenderOutput(n *navigator.Navigator, s *navigator.Selected) {
 			currentRow++
 		}
 
+		if n.IsActive {
+			Cell(PromptLine, n.StartCell)
+		}
+
 	}
-	Cell(PromptLine, 1)
-	// Cell(GetNumVisibleLines(), 1)
-	// MoveCursorTop()
-	// n.NumVisibleLines = GetNumVisibleLines() - reserverdRows
-
-	// n.SetEndLine(n.GetStartLine() + n.NumVisibleLines)
-
-	// PrintHeader(n.CurrentPath + Space + entry.PrintSizeAsString(*n.GetDirSize()))
-	// printTopBorder()
-
-	// if n.EndLine > n.GetEntriesLength() {
-	// 	n.SetEndLine(n.GetEntriesLength())
-	// }
-
-	// var sep string
-	// ClearLine()
-
-	// if !n.HasEntries() {
-	// 	PrintEmpty()
-	// }
-	// for i := n.StartLine; i < n.EndLine; i++ {
-
-	// 	if i == n.GetEntriesLength()-1 {
-	// 		sep = CornerLine + Hseparator
-	// 	} else {
-	// 		sep = TeeLine + Hseparator
-	// 	}
-	// 	ClearLine()
-	// 	if n.CurrentIndex == i {
-	// 		HighlightRow(sep, *n.GetEntry(i))
-	// 	} else if _, ok := s.SelectedEntries[n.GetEntry(i)]; ok {
-	// 		MarkRow(sep, *n.GetEntry(i))
-	// 	} else {
-	// 		PrintRow(sep, *n.GetEntry(i))
-	// 	}
-
-	// }
+	// Cell(PromptLine, 1)
 }
 
 func ShowCursor() {
