@@ -10,17 +10,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jbystronski/godirscan/pkg/config"
-	"github.com/jbystronski/godirscan/pkg/navigator"
-	"github.com/jbystronski/godirscan/pkg/terminal"
+	"github.com/jbystronski/godirscan/pkg/common"
+	"github.com/jbystronski/godirscan/pkg/filesystem"
 )
 
 var (
-	stopProgress    = make(chan struct{}, 1)
-	currentFileName = make(chan string)
-	wg              sync.WaitGroup
-	sem             = make(chan struct{}, config.Cfg.MaxWorkers)
-	skipAll         bool
+	wg      sync.WaitGroup
+	sem     = make(chan struct{}, common.Cfg.MaxWorkers)
+	skipAll bool
 )
 
 func openFile(path string) (*os.File, error) {
@@ -106,14 +103,14 @@ func tryCreateSymlink(srcPath, targetPath string) (bool, error) {
 		if symlinkErr != nil {
 			return false, symlinkErr
 		}
-		currentFileName <- fmt.Sprint("Created symlink ", targetPath, " ")
+		//	currentFileName <- fmt.Sprint("Created symlink ", targetPath, " ")
 		return true, nil
 
 	}
 	return false, nil
 }
 
-func move(srcPath, targetPath string) error {
+func move(srcPath, targetPath string, messageChan chan<- string) error {
 	var err error
 	var ok bool
 
@@ -155,7 +152,7 @@ func move(srcPath, targetPath string) error {
 			}
 
 			for _, entry := range dc {
-				err = move(filepath.Join(srcPath, entry.Name()), filepath.Join(targetPath, entry.Name()))
+				err = move(filepath.Join(srcPath, entry.Name()), filepath.Join(targetPath, entry.Name()), messageChan)
 				if err != nil {
 					return err
 				}
@@ -168,9 +165,10 @@ func move(srcPath, targetPath string) error {
 			go func(srcPath, targetPath string) {
 				defer func(path string) {
 					wg.Done()
-					currentFileName <- fmt.Sprint("Finished writing ", path, " ")
+					messageChan <- fmt.Sprint("Finished copying ", path)
+					//	currentFileName <- fmt.Sprint("Finished writing ", path, " ")
 				}(targetPath)
-				currentFileName <- fmt.Sprint("Writing ", targetPath, " ")
+				//	currentFileName <- fmt.Sprint("Writing ", targetPath, " ")
 				err = writeFile(srcPath, targetPath)
 
 				<-sem
@@ -196,65 +194,56 @@ func addSuffixIfExists(targetPath string) string {
 	}
 }
 
-func Relocate(prompt string, deleteCopied bool, selected *navigator.Selected, currentPath string, offset int) (bool, error) {
-	answ, err := WaitInput(fmt.Sprintf("%s %s", prompt, "selected into the current directory? :"), "y", terminal.PromptLine, offset)
-	if err != nil {
-		panic(err)
-	}
+func Relocate(prompt string, deleteCopied bool, selected *filesystem.Selected, currentPath string, messageChan chan<- string) (bool, error) {
+	for pathToSelected := range (selected).All() {
 
-	if answ != "y" {
-		return false, nil
-	}
-
-	go func() {
-		terminal.PrintProgress(stopProgress, currentFileName)
-	}()
-
-	for entry := range selected.GetAll() {
-
-		if *entry.Path == currentPath {
-			stopProgress <- struct{}{}
-
+		if pathToSelected == currentPath {
 			return false, errors.New("copying / moving within same directory is not permitted")
 		}
 
-		if strings.HasPrefix(currentPath, entry.FullPath()) {
-			stopProgress <- struct{}{}
-
+		if strings.HasPrefix(currentPath, pathToSelected) {
 			return false, errors.New("cannot move / copy a folder into itself")
 		}
 
-		wg.Add(1)
-		srcPath := filepath.Join(*entry.Path, entry.Name)
+		// wg.Add(1)
+		srcPath := pathToSelected
 
-		targetPath := addSuffixIfExists(filepath.Join(currentPath, entry.Name))
-		go func(srcPath, targetPath string) {
-			defer func() {
-				if deleteCopied {
-					err = os.RemoveAll(srcPath)
-					if err != nil {
-						panic(err)
-					}
-				}
+		_, fileName := filepath.Split(srcPath)
 
-				wg.Done()
-			}()
+		targetPath := addSuffixIfExists(filepath.Join(currentPath, fileName))
+		// go func(srcPath, targetPath string) {
+		// 	defer func() {
+		// 		if deleteCopied {
+		// 			err = os.RemoveAll(srcPath)
+		// 			if err != nil {
+		// 				panic(err)
+		// 			}
+		// 		}
 
-			terminal.ClearLine()
-			terminal.CarriageReturn()
+		// 		wg.Done()
+		// 	}()
 
-			err = move(srcPath, targetPath)
+		//	terminal.ClearLine()
+		//	terminal.CarriageReturn()
+
+		err := move(srcPath, targetPath, messageChan)
+		//	<-sem
+		if err != nil {
+			panic(err)
+		}
+		if deleteCopied {
+			err = os.RemoveAll(srcPath)
 			if err != nil {
 				panic(err)
 			}
-		}(srcPath, targetPath)
+		}
+
+		// }(srcPath, targetPath)
+		// sem <- struct{}{}
 
 	}
 	wg.Wait()
 
-	terminal.ClearLine()
-	terminal.CarriageReturn()
-	stopProgress <- struct{}{}
 	return true, nil
 
 	// TODO: after copying sort according to current sorting alghoritm
