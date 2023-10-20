@@ -4,16 +4,6 @@ import (
 	"time"
 )
 
-type StoreItem interface {
-	NameAccessor
-}
-
-type DataAccessor interface {
-	AllItems() []*StoreItem
-	Len() int
-	FindItem(int) *StoreItem
-}
-
 type SizeAccessor interface {
 	Size() int
 }
@@ -34,13 +24,6 @@ type Convert interface {
 	Convert()
 }
 
-type StoreAccessor interface {
-	NameAccessor
-	NameMutator
-	Items() DataAccessor
-	SetItems(DataAccessor)
-}
-
 type Cancelable interface {
 	Create()
 	Cancel()
@@ -56,10 +39,13 @@ type Tickable interface {
 	IsInitialized() bool
 }
 
-type Controller interface {
-	ActionMap() map[ControllerAction]func()
-	SetActionMap(map[ControllerAction]func())
-	Map(ControllerAction)
-	Active() bool
-	SetActive(bool)
+type MapAccessor[K comparable, V any] interface {
+	Get(K) (V, bool)
+	Set(K, V)
+	Unset(K)
+	Clear()
+	Exists(K) bool
+	Len() int
+	Self() map[K]V
+	Copy() map[K]V
 }

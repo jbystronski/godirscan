@@ -1,28 +1,25 @@
 package filesystem
 
 import (
-	"math"
+	"github.com/jbystronski/godirscan/pkg/common"
 )
 
-var (
-	cache          = make(map[string]FsStore)
-	cacheEntrySize = math.Pow(1000, 3)
-)
-
-func Clear() {
-	cache = make(map[string]FsStore)
+type CacheStore struct {
+	common.MapAccessor[string, int]
+	minSize int
 }
 
-func Get(key string) (FsStore, bool) {
-	if store, exist := cache[key]; exist {
-		return store, true
+func NewCacheStore(min int) *CacheStore {
+	return &CacheStore{
+		MapAccessor: &common.GenericMap[string, int]{},
+		minSize:     min,
 	}
-
-	return FsStore{}, false
 }
 
-func Set(store FsStore) {
-	if store.Size() >= int(cacheEntrySize) {
-		cache[store.Name()] = store
+func (c *CacheStore) Set(k string, v int) {
+	if v < c.minSize {
+		return
 	}
+
+	c.MapAccessor.Set(k, v)
 }

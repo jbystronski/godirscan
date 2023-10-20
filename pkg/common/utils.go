@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 )
 
 const (
@@ -161,14 +161,6 @@ func ClearScreen() {
 	cmd.Run()
 }
 
-func trimLine(line string, max int) string {
-	if utf8.RuneCountInString(line) > max {
-		line = line[0:max]
-		//*line += *line + "..."
-	}
-	return fmt.Sprintf("%v%v", line, reset)
-}
-
 func ClearRow(row, offsetLeft, length int) {
 	Cell(row, offsetLeft)
 	fmt.Print(strings.Repeat(space, length))
@@ -234,7 +226,7 @@ func PrintProgress(doneChan <-chan struct{}, messageChan <-chan string, offsetLe
 
 			//	time.Sleep(time.Millisecond * 100)
 			// fmt.Print(strings.Repeat(CursorLeft, len(output)))
-			time.Sleep(time.Millisecond * 200)
+			//	time.Sleep(time.Millisecond * 40)
 			output = ""
 			ClearLine()
 			CarriageReturn()
@@ -322,4 +314,10 @@ func FlashError(err error) {
 	Erase(numOfLines, 1, numOfCols)
 	Cell(numOfLines, 2)
 	PrintHelpers(*CurrentTheme)
+}
+
+func GetRootDirectory() string {
+	wd, _ := os.Getwd()
+
+	return filepath.VolumeName(wd) + string(filepath.Separator)
 }

@@ -2,16 +2,37 @@ package filesystem
 
 import "github.com/jbystronski/godirscan/pkg/common"
 
-type FsDataAccessor interface {
-	All() []*FsFiletype
+type DataAccessor interface {
+	All() []*FsEntry
 	Len() int
-	Insert(FsFiletype)
+	Insert(*FsEntry)
 	Less(i, j int) bool
 	Swap(i, j int)
-	Find(int) *FsFiletype
+	Find(int) (*FsEntry, bool)
 	SortByName()
-	sortByType()
-	FindByPath(string) *FsFiletype
+	SortByType()
+	FindByPath(string) (*FsEntry, bool)
+	Reset()
+	Size() int
+}
+
+type DataPool interface {
+	Get() FsEntry
+	Put(FsEntry)
+}
+
+type FsDataAccessor interface {
+	Self() []*FsEntry
+	Len() int
+	Insert(*FsEntry)
+	Less(i, j int) bool
+	Swap(i, j int)
+	Find(int) (*FsEntry, bool)
+	SortByName()
+	SortByType()
+	FindByPath(string) (*FsEntry, bool)
+	Reset()
+	Size() int
 }
 
 type PathAccessor interface {
@@ -25,33 +46,28 @@ type PathMutator interface {
 
 type FsFiletype interface {
 	PathAccessor
-	PathMutator
+	// Path() string
+	// FullPath() string
+	// // PathMutator
 	common.SizeAccessor
 	common.SizeMutator
 	common.NameAccessor
 	common.NameMutator
-	Rename
-	printSize() string
+
 	String() string
-}
 
-type Rename interface {
-	Rename(string) (bool, error)
-}
-
-type executable interface {
-	execute() error
-}
-
-type Editable interface {
-	Edit() error
+	SetFsType(FsEntity)
+	FsType() FsEntity
 }
 
 type FsStoreAccessor interface {
-	common.StoreAccessor
-	Data() FsDataAccessor
-	SetData(FsDataAccessor)
+	common.NameAccessor
+	common.NameMutator
 
-	ParentStoreName() (string, bool)
+	Data() FsDataAccessor
+	SetData(string) error
+	ResetData()
+
+	GetParentDirectory() (string, bool)
 	common.SizeAccessor
 }

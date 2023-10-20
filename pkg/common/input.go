@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	k "github.com/eiannone/keyboard"
+	"github.com/jbystronski/godirscan/pkg/command_line"
 )
 
 func WaitInput(prompt, output string, coords Coords, errChan chan<- error,
@@ -18,7 +19,7 @@ func WaitInput(prompt, output string, coords Coords, errChan chan<- error,
 
 	fmt.Print(PrintPrompt(prompt, *CurrentTheme) + " ")
 
-	cmdLine := NewCommandLine(coords.Y, coords.X+len(prompt)+1, PaneWidth()-2, output)
+	cmdLine := command_line.NewCommandLine(coords.Y, coords.X+len(prompt)+1, PaneWidth()-2, output)
 
 	for {
 
