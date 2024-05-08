@@ -1,24 +1,24 @@
 package menu
 
 import (
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 )
 
 func QuitMenu() *MenuController {
 	opts := []MenuOption{
 		{
 			Label: "Quit application",
-			Event: event.QUIT_APP,
+			Event: pubsub.QUIT_APP,
 		},
 		{
 			Label: "Cancel",
-			Event: event.Q,
+			Event: pubsub.Q,
 		},
 	}
 
 	c := NewMenuController(opts, Dimensions{Width: 23, Height: 6})
 
-	c.On(event.ENTER, func() {
+	c.On(pubsub.ENTER, func() {
 		opt := c.Options[c.Index()]
 
 		switch true {

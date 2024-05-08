@@ -1,8 +1,7 @@
 package filesystem
 
 import (
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/message"
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 )
 
 func (c *FsController) executeCmd(args, path string) {
@@ -11,8 +10,8 @@ func (c *FsController) executeCmd(args, path string) {
 
 	c.Node.LinkTo(cmdOutput)
 
-	c.Publish("command_args", message.Message(args))
-	c.Publish("command_args", message.Message(path))
+	c.Publish("command_args", pubsub.Message(args))
+	c.Publish("command_args", pubsub.Message(path))
 
-	c.Passthrough(event.RENDER, c.Next)
+	c.Passthrough(pubsub.RENDER, c.Next)
 }

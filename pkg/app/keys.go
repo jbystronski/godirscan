@@ -5,67 +5,66 @@ import (
 
 	"github.com/eiannone/keyboard"
 
-	e "github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/message"
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
 )
 
 var (
 	keyboardInit sync.Once
-	n            *e.Node
+	n            *pubsub.Node
 	k            *Keys
 )
 
 type Keys struct {
-	*e.Node
-	keysMap map[keyboard.Key]e.Event
-	runeMap map[rune]e.Event
+	*pubsub.Node
+	keysMap map[keyboard.Key]pubsub.Event
+	runeMap map[rune]pubsub.Event
 }
 
-func NewKeyboard() *e.Node {
+func NewKeyboard() *pubsub.Node {
 	keyboardInit.Do(func() {
-		n = e.NewNode()
+		n = pubsub.NewNode()
 
 		k = &Keys{
 			n,
-			map[keyboard.Key]e.Event{
-				keyboard.KeyArrowDown:  e.ARROW_DOWN,
-				keyboard.KeyArrowLeft:  e.ARROW_LEFT,
-				keyboard.KeyArrowUp:    e.ARROW_UP,
-				keyboard.KeyArrowRight: e.ARROW_RIGHT,
-				keyboard.KeyEsc:        e.ESC,
-				keyboard.KeyTab:        e.TAB,
-				keyboard.KeyInsert:     e.INSERT,
-				keyboard.KeyCtrlA:      e.CTRL_A,
-				keyboard.KeyCtrlB:      e.CTRL_B,
-				keyboard.KeyCtrlF:      e.CTRL_F,
-				keyboard.KeyCtrlR:      e.CTRL_R,
-				keyboard.KeyCtrlS:      e.CTRL_S,
-				keyboard.KeyCtrlV:      e.CTRL_V,
-				keyboard.KeyF7:         e.F7,
-				keyboard.KeyF6:         e.F6,
-				keyboard.KeyDelete:     e.DELETE,
-				keyboard.KeyCtrlK:      e.CTRL_K,
-				keyboard.KeyHome:       e.HOME,
-				keyboard.KeyEnd:        e.END,
-				keyboard.KeyPgdn:       e.PG_DOWN,
-				keyboard.KeyPgup:       e.PG_UP,
-				keyboard.KeyEnter:      e.ENTER,
+			map[keyboard.Key]pubsub.Event{
+				keyboard.KeyArrowDown:  pubsub.ARROW_DOWN,
+				keyboard.KeyArrowLeft:  pubsub.ARROW_LEFT,
+				keyboard.KeyArrowUp:    pubsub.ARROW_UP,
+				keyboard.KeyArrowRight: pubsub.ARROW_RIGHT,
+				keyboard.KeyEsc:        pubsub.ESC,
+				keyboard.KeyTab:        pubsub.TAB,
+				keyboard.KeyInsert:     pubsub.INSERT,
+				keyboard.KeyCtrlA:      pubsub.CTRL_A,
+				keyboard.KeyCtrlB:      pubsub.CTRL_B,
+				keyboard.KeyCtrlF:      pubsub.CTRL_F,
+				keyboard.KeyCtrlR:      pubsub.CTRL_R,
+				keyboard.KeyCtrlS:      pubsub.CTRL_S,
+				keyboard.KeyCtrlV:      pubsub.CTRL_V,
+				keyboard.KeyF7:         pubsub.F7,
+				keyboard.KeyF6:         pubsub.F6,
+				keyboard.KeyDelete:     pubsub.DELETE,
+				keyboard.KeyCtrlK:      pubsub.CTRL_K,
+				keyboard.KeyHome:       pubsub.HOME,
+				keyboard.KeyEnd:        pubsub.END,
+				keyboard.KeyPgdn:       pubsub.PG_DOWN,
+				keyboard.KeyPgup:       pubsub.PG_UP,
+				keyboard.KeyEnter:      pubsub.ENTER,
 			},
-			map[rune]e.Event{
-				'h': e.H,
-				'q': e.Q,
-				'l': e.L,
-				'i': e.I,
-				'm': e.M,
-				's': e.S,
-				't': e.T,
-				'd': e.D,
-				'f': e.F,
-				'e': e.E,
-				'c': e.C,
-				'g': e.G,
+			map[rune]pubsub.Event{
+				'h': pubsub.H,
+				'q': pubsub.Q,
+				'l': pubsub.L,
+				'i': pubsub.I,
+				'm': pubsub.M,
+				's': pubsub.S,
+				't': pubsub.T,
+				'd': pubsub.D,
+				'f': pubsub.F,
+				'e': pubsub.E,
+				'c': pubsub.C,
+				'g': pubsub.G,
 			},
 		}
 
@@ -78,7 +77,7 @@ func NewKeyboard() *e.Node {
 func (keys *Keys) Init() {
 	keysEvents, err := keyboard.GetKeys(1)
 	if err != nil {
-		keys.Publish("err", message.Message(err.Error()))
+		keys.Publish("err", pubsub.Message(err.Error()))
 	}
 
 	go func() {

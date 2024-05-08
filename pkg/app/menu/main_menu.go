@@ -1,7 +1,7 @@
 package menu
 
 import (
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
 )
 
@@ -10,115 +10,115 @@ func MainMenu() *MenuController {
 		{
 			Label:       "Switch panel",
 			Description: "(TAB)",
-			Event:       event.TAB,
+			Event:       pubsub.TAB,
 		},
 
 		{
 			Label:       "Select",
 			Description: "(INSERT)",
-			Event:       event.INSERT,
+			Event:       pubsub.INSERT,
 		},
 
 		{
 			Label:       "Enter / execute file",
 			Description: "(ENTER)",
-			Event:       event.ENTER,
+			Event:       pubsub.ENTER,
 		},
 
 		{
 			Label:       "Select / deselect all",
 			Description: "(CTRL A)",
-			Event:       event.CTRL_A,
+			Event:       pubsub.CTRL_A,
 		},
 		{
 			Label:       "Edit file",
 			Description: "(E)",
-			Event:       event.E,
+			Event:       pubsub.E,
 		},
 		{
 			Label:       "Display file info",
 			Description: "(I)",
-			Event:       event.I,
+			Event:       pubsub.I,
 		},
 		{
 			Label:       "Scan directory",
 			Description: "(S)",
-			Event:       event.S,
+			Event:       pubsub.S,
 		},
 		{
 			Label:       "Rename file / directory",
 			Description: "(CTRL R)",
-			Event:       event.CTRL_R,
+			Event:       pubsub.CTRL_R,
 		},
 		{
 			Label:       "Create new directory",
 			Description: "(D)",
-			Event:       event.D,
+			Event:       pubsub.D,
 		},
 		{
 			Label:       "Create new file",
 			Description: "(F)",
-			Event:       event.F,
+			Event:       pubsub.F,
 		},
 		{
 			Label:       "Search",
 			Description: "(CTRL F)",
-			Event:       event.CTRL_F,
+			Event:       pubsub.CTRL_F,
 		},
 		{
 			Label:       "Copy selected",
 			Description: "(CTRL V)",
-			Event:       event.CTRL_V,
+			Event:       pubsub.CTRL_V,
 		},
 		{
 			Label:       "Move selected",
 			Description: "(F6)",
-			Event:       event.F6,
+			Event:       pubsub.F6,
 		},
 		{
 			Label:       "Go to entry",
 			Description: "(G)",
-			Event:       event.G,
+			Event:       pubsub.G,
 		},
 		{
 			Label:       "Delete selected entries",
 			Description: "(DELETE)",
-			Event:       event.DELETE,
+			Event:       pubsub.DELETE,
 		},
 
 		{
 			Label:       "Change theme",
 			Description: "(T)",
-			Event:       event.T,
+			Event:       pubsub.T,
 		},
 
 		{
 			Label:       "Close menu",
 			Description: "(Q)",
-			Event:       event.Q,
+			Event:       pubsub.Q,
 		},
 
 		{
 			Label: "Sort",
-			Event: event.SORT_MENU,
+			Event: pubsub.SORT_MENU,
 		},
 		{
 			Label: "Edit settings (default location)",
-			Event: event.SETTINGS,
+			Event: pubsub.SETTINGS,
 		},
 		{
 			Label: "Bookmarks",
-			Event: event.BOOKMARK_GROUP_LIST,
+			Event: pubsub.BOOKMARK_GROUP_LIST,
 		},
 		{
 			Label: "Quit",
-			Event: event.ESC,
+			Event: pubsub.ESC,
 		},
 	}
 
 	c := NewMenuController(options, Dimensions{Height: 15, Width: termui.NewTerminal().Cols() / 3})
 
-	c.On(event.ENTER, func() {
+	c.On(pubsub.ENTER, func() {
 		opt := c.Options[c.Index()]
 
 		switch true {

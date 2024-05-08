@@ -6,19 +6,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
 )
 
 type FileInfoController struct {
-	*event.Node
+	*pubsub.Node
 	data fs.FileInfo
 	size int
 	view termui.Section
 }
 
-func NewFileInfo(file fs.FileInfo, size int) *event.Node {
-	n := event.NewNode()
+func NewFileInfo(file fs.FileInfo, size int) *pubsub.Node {
+	n := pubsub.NewNode()
 
 	c := FileInfoController{
 		n,
@@ -28,18 +28,18 @@ func NewFileInfo(file fs.FileInfo, size int) *event.Node {
 	}
 	c.view.SetBorder().SetPadding(1, 2, 1, 2).SetHeight(30).SetWidth(70).CenterVertically().CenterHorizontally()
 
-	n.OnGlobal(event.RESIZE, func() {
+	n.OnGlobal(pubsub.RESIZE, func() {
 		c.view.CenterVertically().CenterHorizontally()
 		c.render()
 	})
 
-	n.On(event.RENDER, c.render)
+	n.On(pubsub.RENDER, c.render)
 
-	c.Node.OnGlobal(event.T, c.render)
+	c.Node.OnGlobal(pubsub.T, c.render)
 
-	n.On(event.Q, func() {
+	n.On(pubsub.Q, func() {
 		c.Node.Unlink()
-		n.Passthrough(event.RENDER, n.First())
+		n.Passthrough(pubsub.RENDER, n.First())
 	})
 
 	return n

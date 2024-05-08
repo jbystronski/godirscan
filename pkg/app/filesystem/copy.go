@@ -9,8 +9,7 @@ import (
 
 	"github.com/jbystronski/godirscan/pkg/app/boxes"
 	"github.com/jbystronski/godirscan/pkg/global"
-	e "github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/message"
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 )
 
 func (c *FsController) Copy(deleteAfter bool) error {
@@ -33,7 +32,7 @@ func (c *FsController) Copy(deleteAfter bool) error {
 
 	progress.Watch()
 	c.LinkTo(progress)
-	c.Passthrough(e.RENDER, c.Next)
+	c.Passthrough(pubsub.RENDER, c.Next)
 
 	for source := range entries {
 
@@ -65,7 +64,7 @@ func (c *FsController) Copy(deleteAfter bool) error {
 			}
 
 			c.insertEntry(c.root, info)
-			c.Publish("progress_message", message.Message("copying "+source))
+			c.Publish("progress_message", pubsub.Message("copying "+source))
 
 			c.selected.Toggle(source)
 

@@ -7,35 +7,35 @@ import (
 	"github.com/jbystronski/godirscan/pkg/app/config"
 	"github.com/jbystronski/godirscan/pkg/app/filesystem"
 	"github.com/jbystronski/godirscan/pkg/app/menu"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
-	m "github.com/jbystronski/godirscan/pkg/lib/pubsub/message"
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
+
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
 )
 
 var (
 	startOnce sync.Once
-	startNode *event.Node
+	startNode *pubsub.Node
 )
 
-func NewStart() *event.Node {
+func NewStart() *pubsub.Node {
 	startOnce.Do(func() {
-		n := event.NewNode()
+		n := pubsub.NewNode()
 
-		n.On(event.RENDER, printStartScreen)
+		n.On(pubsub.RENDER, printStartScreen)
 
-		n.On(event.S, func() {
+		n.On(pubsub.S, func() {
 			printStartPrompt(n)
 		})
 
-		n.OnGlobal(event.T, printStartScreen)
+		n.OnGlobal(pubsub.T, printStartScreen)
 
-		n.OnGlobal(event.RESIZE, printStartScreen)
+		n.OnGlobal(pubsub.RESIZE, printStartScreen)
 
-		n.On(event.ESC, func() {
+		n.On(pubsub.ESC, func() {
 			m := menu.QuitMenu()
 			m.Watch()
 			n.LinkTo(m.Node)
-			n.Passthrough(event.RENDER, n.Next)
+			n.Passthrough(pubsub.RENDER, n.Next)
 		})
 
 		startNode = n
@@ -73,18 +73,18 @@ func printStartScreen() {
 	hideCursor()
 }
 
-func printStartPrompt(n *event.Node) {
+func printStartPrompt(n *pubsub.Node) {
 	clear(rows(), 1, cols())
 
 	cmd := termui.NewCommandLine(rows(), 1, "Scan a directory", fmtPrompt, config.Running().DefaultRootDirectory)
 	root := cmd.WaitInput()
 
 	if root == "" {
-		n.Passthrough(event.RENDER, n)
+		n.Passthrough(pubsub.RENDER, n)
 	} else {
 
 		if _, err := os.Stat(root); err != nil {
-			n.Publish("err", m.Message(err.Error()))
+			n.Publish("err", pubsub.Message(err.Error()))
 			return
 		}
 
@@ -92,7 +92,7 @@ func printStartPrompt(n *event.Node) {
 
 		fs.Watch()
 		n.Prev.LinkTo(fs)
-		n.Prev.Passthrough(event.INIT, n.Prev.Next)
+		n.Prev.Passthrough(pubsub.INIT, n.Prev.Next)
 
 	}
 }

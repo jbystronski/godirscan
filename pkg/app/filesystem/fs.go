@@ -11,13 +11,12 @@ import (
 	"github.com/jbystronski/godirscan/pkg/global"
 
 	"github.com/jbystronski/godirscan/pkg/lib/maps"
-	e "github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/message"
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
 )
 
 type FsController struct {
-	*e.Node
+	*pubsub.Node
 	termui.Navigator
 
 	root        string
@@ -36,7 +35,7 @@ type FsController struct {
 	// ui Panel
 }
 
-func NewFsController(n *e.Node) *FsController {
+func NewFsController(n *pubsub.Node) *FsController {
 	pool := data.NewDataPool()
 	selected := data.NewSelected()
 	cache := data.NewCacheStore(104857600)
@@ -86,7 +85,7 @@ func NewFsController(n *e.Node) *FsController {
 	c.alt.MinOffset = c.alt.panel.OutputFirstLine()
 	c.alt.MaxOffset = c.alt.panel.OutputLastLine() - 1
 
-	c.On(e.INIT, func() {
+	c.On(pubsub.INIT, func() {
 		if c.root == "" {
 			c.sendError(errors.New("empty root path"))
 		}
@@ -118,7 +117,7 @@ func NewFsController(n *e.Node) *FsController {
 }
 
 func registerEvents(c *FsController) {
-	// c.On(e.INIT, func() {
+	// c.On(pubsub.INIT, func() {
 	// 	if c.root == "" {
 	// 		c.sendError(errors.New("empty root path"))
 	// 	}
@@ -139,7 +138,7 @@ func registerEvents(c *FsController) {
 	// 	}
 	// })
 
-	c.On(e.TAB, func() {
+	c.On(pubsub.TAB, func() {
 		main := c
 		alt := c.alt
 		c = alt
@@ -159,27 +158,27 @@ func registerEvents(c *FsController) {
 		//	c.Active().changeActive()
 	})
 
-	c.Subscribe("add_bookmark_group", func(m message.Message) {
+	c.Subscribe("add_bookmark_group", func(m pubsub.Message) {
 		c.EnqueueMessage("add_bookmark_group", m)
 	})
 
-	c.Subscribe("bookmark", func(m message.Message) {
+	c.Subscribe("bookmark", func(m pubsub.Message) {
 		c.EnqueueMessage("bookmark", m)
 	})
 
-	c.Subscribe("open_bookmark", func(m message.Message) {
+	c.Subscribe("open_bookmark", func(m pubsub.Message) {
 		c.EnqueueMessage("open_bookmark", m)
 	})
 
-	c.Subscribe("remove_bookmark", func(m message.Message) {
+	c.Subscribe("remove_bookmark", func(m pubsub.Message) {
 		c.EnqueueMessage("remove_bookmark", m)
 	})
 
-	c.Subscribe("bookmark_group", func(m message.Message) {
+	c.Subscribe("bookmark_group", func(m pubsub.Message) {
 		c.EnqueueMessage("bookmark_group", m)
 	})
 
-	c.On(e.RENDER, func() {
+	c.On(pubsub.RENDER, func() {
 		cls()
 		hideCursor()
 		c.UpdateSize()
@@ -192,7 +191,7 @@ func registerEvents(c *FsController) {
 		// c.alt.restoreScreen()
 	})
 
-	c.On(e.CTRL_V, func() {
+	c.On(pubsub.CTRL_V, func() {
 		answ := c.getInput("Copy selected into the current directory? :", "y")
 
 		if answ != "y" || c.selected.Len() == 0 {
@@ -204,7 +203,7 @@ func registerEvents(c *FsController) {
 		}
 	})
 
-	c.On(e.F6, func() {
+	c.On(pubsub.F6, func() {
 		answ := c.getInput("Move selected into the current directory? :", "y")
 
 		if answ != "y" || c.selected.Len() == 0 {
@@ -216,40 +215,40 @@ func registerEvents(c *FsController) {
 		}
 	})
 
-	c.On(e.BOOKMARK_GROUP_LIST, func() {
+	c.On(pubsub.BOOKMARK_GROUP_LIST, func() {
 		c.OpenMenu(menu.BookmarkGroupListMenu())
 	})
 
-	c.On(e.BOOKMARK_ADD_GROUP, func() {
+	c.On(pubsub.BOOKMARK_ADD_GROUP, func() {
 		c.addBookmarkGroup()
 
 		c.OpenMenu(menu.BookmarkGroupListMenu())
 	})
 
-	c.On(e.BOOKMARK_REMOVE_GROUP, func() {
+	c.On(pubsub.BOOKMARK_REMOVE_GROUP, func() {
 		c.removeBookmarkGroup(string(c.DequeueMessage("bookmark_group")))
 
 		c.OpenMenu(menu.BookmarkGroupListMenu())
 	})
 
-	c.On(e.REMOVE_BOOKMARK, func() {
+	c.On(pubsub.REMOVE_BOOKMARK, func() {
 		bGroup := string(c.DequeueMessage("bookmark_group"))
 		bName := string(c.DequeueMessage("remove_bookmark"))
 
 		c.removeBookmark(bGroup, bName)
 	})
 
-	c.On(e.BOOKMARK_OPEN, func() {
+	c.On(pubsub.BOOKMARK_OPEN, func() {
 		c.openBookmark(string(c.DequeueMessage("bookmark")))
 	})
 
-	c.On(e.BOOKMARK, func() {
+	c.On(pubsub.BOOKMARK, func() {
 		group := c.DequeueMessage("bookmark_group")
 
 		c.bookmark(string(group))
 	})
 
-	c.On(e.BOOKMARK_GROUP, func() {
+	c.On(pubsub.BOOKMARK_GROUP, func() {
 		if c.HasNext() {
 			c.Next.Unlink()
 		}
@@ -258,81 +257,81 @@ func registerEvents(c *FsController) {
 
 		m.Watch()
 		c.LinkTo(m.Node)
-		c.Passthrough(e.RENDER, c.Next)
+		c.Passthrough(pubsub.RENDER, c.Next)
 	})
 
-	c.On(e.END, func() {
+	c.On(pubsub.END, func() {
 		if c.LastEntry() {
 			c.render()
 		}
 	})
 
-	c.On(e.HOME, func() {
+	c.On(pubsub.HOME, func() {
 		if c.FirstEntry() {
 			c.render()
 		}
 	})
 
-	c.On(e.PG_UP, func() {
+	c.On(pubsub.PG_UP, func() {
 		if c.data.Len() > 0 && c.MovePgUp() {
 			c.render()
 		}
 	})
 
-	c.On(e.PG_DOWN, func() {
+	c.On(pubsub.PG_DOWN, func() {
 		if c.MovePgDown(c.contentLines()) {
 			c.render()
 		}
 	})
 
-	c.On(e.INSERT, func() {
+	c.On(pubsub.INSERT, func() {
 		c.selectEntry()
 	})
 
-	c.On(e.ARROW_DOWN, func() {
+	c.On(pubsub.ARROW_DOWN, func() {
 		if c.NextEntry() {
 			c.render()
 		}
 	})
 
-	c.On(e.ARROW_UP, func() {
+	c.On(pubsub.ARROW_UP, func() {
 		if c.PrevEntry() {
 			c.render()
 		}
 	})
 
-	c.On(e.SORT_NAME, func() {
+	c.On(pubsub.SORT_NAME, func() {
 		c.sortByName()
 	})
 
-	c.On(e.SORT_TYPE, func() {
+	c.On(pubsub.SORT_TYPE, func() {
 		c.sortByType()
 	})
 
-	c.On(e.SORT_SIZE_ASC, func() {
+	c.On(pubsub.SORT_SIZE_ASC, func() {
 		c.sortBySizeAsc()
 	})
 
-	c.On(e.SORT_SIZE_DESC, func() {
+	c.On(pubsub.SORT_SIZE_DESC, func() {
 		c.sortBySizeDesc()
 	})
 
-	c.On(e.SETTINGS, func() {
+	c.On(pubsub.SETTINGS, func() {
 		c.executeCmd(config.Running().DefaultEditor, config.Running().GetSettingsFilepath())
 	})
 
-	c.On(e.ARROW_RIGHT, func() {
+	c.On(pubsub.ARROW_RIGHT, func() {
 		c.right()
 	})
 
-	c.On(e.ARROW_LEFT, func() {
+	c.On(pubsub.ARROW_LEFT, func() {
 		c.left()
 	})
 
-	c.On(e.ENTER, func() {
+	c.On(pubsub.ENTER, func() {
 		c.execute()
 	})
-	c.On(e.C, func() {
+	c.On(pubsub.C, func() {
 		args := c.getInput("Execute command", "")
 
 		if args == "" {
@@ -344,11 +343,11 @@ func registerEvents(c *FsController) {
 		c.executeCmd(args, path)
 	})
 
-	c.On(e.CTRL_F, func() {
+	c.On(pubsub.CTRL_F, func() {
 		c.search()
 	})
 
-	c.On(e.DELETE, func() {
+	c.On(pubsub.DELETE, func() {
 		answ := c.getInput("Delete selected entries", "y")
 
 		if answ != "y" || c.selected.Len() == 0 {
@@ -369,43 +368,43 @@ func registerEvents(c *FsController) {
 		}
 	})
 
-	c.On(e.E, func() {
+	c.On(pubsub.E, func() {
 		c.edit()
 	})
 
-	c.On(e.F, func() {
+	c.On(pubsub.F, func() {
 		c.newFile()
 	})
 
-	c.On(e.G, func() {
+	c.On(pubsub.G, func() {
 		c.goTo()
 	})
 
-	c.On(e.D, func() {
+	c.On(pubsub.D, func() {
 		c.newDirectory()
 	})
 
-	c.On(e.CTRL_R, func() {
+	c.On(pubsub.CTRL_R, func() {
 		c.rename()
 	})
 
-	c.On(e.CTRL_A, func() {
+	c.On(pubsub.CTRL_A, func() {
 		c.selectAll()
 	})
 
-	c.On(e.SORT_MENU, func() {
+	c.On(pubsub.SORT_MENU, func() {
 		c.OpenMenu(menu.SortMenu())
 	})
 
-	c.On(e.ESC, func() {
+	c.On(pubsub.ESC, func() {
 		c.OpenMenu(menu.QuitMenu())
 	})
 
-	c.On(e.M, func() {
+	c.On(pubsub.M, func() {
 		c.OpenMenu(menu.MainMenu())
 	})
 
-	c.On(e.I, func() {
+	c.On(pubsub.I, func() {
 		if c.data.Len() == 0 {
 			return
 		}
@@ -429,35 +428,35 @@ func registerEvents(c *FsController) {
 
 		info.Watch()
 		c.LinkTo(info)
-		c.Passthrough(e.RENDER, c.Next)
+		c.Passthrough(pubsub.RENDER, c.Next)
 	})
 
-	c.On(e.QUIT_APP, func() {
-		c.Passthrough(e.QUIT_APP, c.First())
+	c.On(pubsub.QUIT_APP, func() {
+		c.Passthrough(pubsub.QUIT_APP, c.First())
 	})
 
-	// c.On(e.Q, func() {
+	// c.On(pubsub.Q, func() {
 	// 	if c.HasNext() {
 	// 		c.Next.Unlink()
-	// 		c.Passthrough(e.RENDER, c.Node)
+	// 		c.Passthrough(pubsub.RENDER, c.Node)
 	// 		// cls()
 	// 		// c.restorePanels()
 	// 	}
 	// })
 
-	c.On(e.S, func() {
+	c.On(pubsub.S, func() {
 		c.scanDir(config.Running().DefaultRootDirectory)
 	})
 
-	c.OnGlobal(e.T, func() {
+	c.OnGlobal(pubsub.T, func() {
 		cls()
 		c.fullRender()
 		c.alt.fullRender()
 	})
 
-	c.OnGlobal(e.RESIZE, func() {
+	c.OnGlobal(pubsub.RESIZE, func() {
 		//	cls()
-		//	time.Sleep(time.Millisecond * 100)
+		//	timpubsub.Sleep(timpubsub.Millisecond * 100)
 
 		c.UpdateSize()
 		c.alt.UpdateSize()
@@ -477,5 +476,5 @@ func (c *FsController) OpenMenu(m *menu.MenuController) {
 
 	m.Watch()
 	c.LinkTo(m.Node)
-	c.Passthrough(e.RENDER, c.Next)
+	c.Passthrough(pubsub.RENDER, c.Next)
 }

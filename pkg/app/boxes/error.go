@@ -3,19 +3,20 @@ package boxes
 import (
 	"time"
 
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
+
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
 )
 
 type ErrorController struct {
-	*event.Node
+	*pubsub.Node
 
 	view       termui.Section
 	errMessage string
 }
 
-func NewError(err string) *event.Node {
-	n := event.NewNode()
+func NewError(err string) *pubsub.Node {
+	n := pubsub.NewNode()
 
 	c := ErrorController{
 		n,
@@ -26,20 +27,20 @@ func NewError(err string) *event.Node {
 	}
 	c.view.SetBorder().SetPadding(1, 2, 1, 2).SetHeight(8).SetWidth(cols() / 3).CenterHorizontally().CenterVertically()
 
-	n.OnGlobal(event.RESIZE, func() {
+	n.OnGlobal(pubsub.RESIZE, func() {
 		c.view.CenterVertically().CenterHorizontally()
 
 		c.Print()
 	})
 
-	n.OnGlobal(event.T, c.Print)
+	n.OnGlobal(pubsub.T, c.Print)
 
-	n.On(event.Q, func() {
+	n.On(pubsub.Q, func() {
 		n.Unlink()
-		n.Passthrough(event.RENDER, n.First())
+		n.Passthrough(pubsub.RENDER, n.First())
 	})
 
-	n.On(event.RENDER, c.Print)
+	n.On(pubsub.RENDER, c.Print)
 
 	return n
 }

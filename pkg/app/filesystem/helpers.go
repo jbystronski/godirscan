@@ -16,7 +16,7 @@ import (
 	"github.com/jbystronski/godirscan/pkg/app/data"
 	"github.com/jbystronski/godirscan/pkg/global"
 	g "github.com/jbystronski/godirscan/pkg/global"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/message"
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
 )
 
@@ -158,7 +158,7 @@ func (c *FsController) updateTotalSize() {
 }
 
 func (c *FsController) sendError(err error) {
-	c.Broker.Publish("err", message.Message(err.Error()))
+	c.Broker.Publish("err", pubsub.Message(err.Error()))
 }
 
 func (c *FsController) updateParentStoreSize(updatedSize int) {

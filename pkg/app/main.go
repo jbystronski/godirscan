@@ -8,17 +8,16 @@ import (
 	"github.com/jbystronski/godirscan/pkg/app/boxes"
 
 	"github.com/jbystronski/godirscan/pkg/app/config"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/message"
 
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 )
 
 var (
 	once sync.Once
-	app  *event.Node
+	app  *pubsub.Node
 )
 
-func New() *event.Node {
+func New() *pubsub.Node {
 	defer func() {
 		keyboard.Close()
 		cls()
@@ -40,35 +39,35 @@ func New() *event.Node {
 
 		start.Watch()
 
-		app := event.NewNode()
+		app := pubsub.NewNode()
 
 		keys.LinkTo(resizer).LinkTo(app).LinkTo(start)
 
-		app.Subscribe("err", func(m message.Message) {
+		app.Subscribe("err", func(m pubsub.Message) {
 			errorScreen := boxes.NewError(string(m))
 			errorScreen.Watch()
 
 			app.Last().LinkTo(errorScreen)
-			app.Passthrough(event.RENDER, app.Last())
+			app.Passthrough(pubsub.RENDER, app.Last())
 		})
 
-		app.OnGlobal(event.T, func() {
+		app.OnGlobal(pubsub.T, func() {
 			config.Running().ChangeTheme(config.CurrentTheme)
 		})
 
-		app.OnGlobal(event.QUIT_APP, func() {
+		app.OnGlobal(pubsub.QUIT_APP, func() {
 			app.UnlinkAll()
 			cls()
 			done <- struct{}{}
 		})
 
-		app.OnGlobal(event.RESIZE, func() {
+		app.OnGlobal(pubsub.RESIZE, func() {
 			updateDimensions()
 
 			if cols() >= MIN_WIDTH && rows() >= MIN_HEIGHT {
 				if app.Next == boxes.NewResizeWarning() {
 					app.LinkTo(start)
-					app.Passthrough(event.RENDER, app.Next)
+					app.Passthrough(pubsub.RENDER, app.Next)
 
 				}
 			}
@@ -80,14 +79,14 @@ func New() *event.Node {
 				warn := boxes.NewResizeWarning()
 				warn.Watch()
 				app.LinkTo(warn)
-				app.Passthrough(event.RENDER, app.Next)
+				app.Passthrough(pubsub.RENDER, app.Next)
 
 			}
 		})
 
-		//	app.Passthrough(event.RENDER, app.Next)
+		//	app.Passthrough(pubsub.RENDER, app.Next)
 		app.Watch()
-		app.Passthrough(event.RESIZE, app)
+		app.Passthrough(pubsub.RESIZE, app)
 
 		<-done
 	})

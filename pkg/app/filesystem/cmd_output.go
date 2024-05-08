@@ -6,18 +6,17 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/message"
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 )
 
-func NewCommandOutput() *event.Node {
-	n := event.NewNode()
+func NewCommandOutput() *pubsub.Node {
+	n := pubsub.NewNode()
 
-	n.Subscribe("command_args", func(m message.Message) {
+	n.Subscribe("command_args", func(m pubsub.Message) {
 		n.EnqueueMessage("command_args", m)
 	})
 
-	n.On(event.RENDER, func() {
+	n.On(pubsub.RENDER, func() {
 		cls()
 
 		command_args := n.DequeueMessage("command_args")
@@ -25,7 +24,7 @@ func NewCommandOutput() *event.Node {
 
 		args := strings.Fields(string(command_args))
 		if len(args) == 0 {
-			n.Passthrough(event.Q, n)
+			n.Passthrough(pubsub.Q, n)
 		}
 
 		args = append(args, string(command_path))
@@ -40,15 +39,15 @@ func NewCommandOutput() *event.Node {
 
 		err := cmd.Run()
 		if err != nil {
-			n.Publish("err", message.Message(error.Error(err)))
+			n.Publish("err", pubsub.Message(error.Error(err)))
 		}
 	})
 
-	n.On(event.Q, func() {
+	n.On(pubsub.Q, func() {
 		cls()
 		n.Unlink()
-		n.Passthrough(event.RENDER, n.Prev)
-		// n.Prev.RunEventCallback(event.UNLINK_NEXT)
+		n.Passthrough(pubsub.RENDER, n.Prev)
+		// n.Prev.RunEventCallback(pubsub.UNLINK_NEXT)
 	})
 
 	return n

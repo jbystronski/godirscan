@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/jbystronski/godirscan/pkg/global"
-	e "github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 )
 
 // var (
@@ -17,14 +17,14 @@ import (
 // )
 
 type ResizeListener struct {
-	*e.Node
+	*pubsub.Node
 	ch   chan os.Signal
 	lock bool
 }
 
-func NewResizeListener() *e.Node {
+func NewResizeListener() *pubsub.Node {
 	// once.Do(func() {
-	n := e.NewNode()
+	n := pubsub.NewNode()
 
 	r := &ResizeListener{n, make(chan os.Signal, 1), false}
 
@@ -50,7 +50,7 @@ func (r *ResizeListener) Init() {
 					r.lock = true
 					global.ClearScreen()
 					time.Sleep(time.Millisecond * 500)
-					r.Passthrough(e.RESIZE, r.Next)
+					r.Passthrough(pubsub.RESIZE, r.Next)
 
 					r.lock = false
 

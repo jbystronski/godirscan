@@ -1,9 +1,9 @@
 package menu
 
-import "github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
+import "github.com/jbystronski/godirscan/pkg/lib/pubsub"
 
 type MenuOption struct {
 	Label, Description string
 
-	Event event.Event
+	Event pubsub.Event
 }

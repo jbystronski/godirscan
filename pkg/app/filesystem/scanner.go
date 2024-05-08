@@ -10,8 +10,8 @@ import (
 	"github.com/jbystronski/godirscan/pkg/app/boxes"
 	"github.com/jbystronski/godirscan/pkg/app/data"
 	"github.com/jbystronski/godirscan/pkg/global"
-	e "github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/message"
+
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 )
 
 func (c *FsController) scanDir(defaultDir string) {
@@ -120,7 +120,7 @@ func (c *FsController) calculateStoreSize() {
 		progress := boxes.NewProgressBox(ctx.CancelFunc)
 		progress.Watch()
 		c.LinkTo(progress)
-		c.Passthrough(e.RENDER, c.Next)
+		c.Passthrough(pubsub.RENDER, c.Next)
 
 		for _, e := range c.data.All() {
 			switch e.FsType() {
@@ -137,7 +137,7 @@ func (c *FsController) calculateStoreSize() {
 						ctx.Observe(func() {
 							size := c.scanSize(e.FullPath(), ctx)
 
-							c.Publish("progress_message", message.Message("Scanning "+e.FullPath()))
+							c.Publish("progress_message", pubsub.Message("Scanning "+e.FullPath()))
 
 							e.SetSize(size)
 							c.cache.Set(e.FullPath(), e.Size())
@@ -158,7 +158,7 @@ func (c *FsController) scanSize(path string, ctx *global.CancelContext) (total i
 	}
 	pathInfo, err := os.Stat(path)
 	if err != nil {
-		c.Publish("err", message.Message(err.Error()))
+		c.Publish("err", pubsub.Message(err.Error()))
 
 		//	return
 	}
@@ -167,7 +167,7 @@ func (c *FsController) scanSize(path string, ctx *global.CancelContext) (total i
 
 	contents, err := global.ReadIgnorePermission(path)
 	if err != nil {
-		c.Publish("err", message.Message(err.Error()))
+		c.Publish("err", pubsub.Message(err.Error()))
 
 		//	return
 	}
@@ -176,7 +176,7 @@ func (c *FsController) scanSize(path string, ctx *global.CancelContext) (total i
 
 		info, err := dirEntry.Info()
 		if err != nil {
-			c.Publish("progress_message", message.Message("Warning "+err.Error()))
+			c.Publish("progress_message", pubsub.Message("Warning "+err.Error()))
 
 			//	c.printScanInfo("Warning: " + err.Error())
 

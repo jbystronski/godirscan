@@ -5,25 +5,25 @@ import (
 	"sync"
 
 	"github.com/jbystronski/godirscan/pkg/app/config"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
 )
 
 var (
 	initResizeWarning    sync.Once
-	resizeWarnNode       *event.Node
+	resizeWarnNode       *pubsub.Node
 	resizeWarnController *ResizeWarnController
 )
 
 type ResizeWarnController struct {
-	*event.Node
+	*pubsub.Node
 	outer termui.Section
 	inner termui.Section
 }
 
-func NewResizeWarning() *event.Node {
+func NewResizeWarning() *pubsub.Node {
 	initResizeWarning.Do(func() {
-		resizeWarnNode = event.NewNode()
+		resizeWarnNode = pubsub.NewNode()
 
 		resizeWarnController = &ResizeWarnController{
 			resizeWarnNode,
@@ -31,10 +31,10 @@ func NewResizeWarning() *event.Node {
 			termui.NewSection(),
 		}
 
-		resizeWarnNode.On(event.RENDER, resizeWarnController.print)
+		resizeWarnNode.On(pubsub.RENDER, resizeWarnController.print)
 
-		resizeWarnNode.On(event.ESC, func() {
-			resizeWarnNode.Passthrough(event.QUIT_APP, resizeWarnNode.First())
+		resizeWarnNode.On(pubsub.ESC, func() {
+			resizeWarnNode.Passthrough(pubsub.QUIT_APP, resizeWarnNode.First())
 		})
 	})
 

@@ -1,41 +1,39 @@
 package menu
 
-import (
-	e "github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
-)
+import "github.com/jbystronski/godirscan/pkg/lib/pubsub"
 
 func SortMenu() *MenuController {
 	options := []MenuOption{
 		{
 			Label: "Main menu",
 
-			Event: e.M,
+			Event: pubsub.M,
 		},
 		{
 			Label: "Sort by name",
 
-			Event: e.SORT_NAME,
+			Event: pubsub.SORT_NAME,
 		},
 		{
 			Label: "Sort by type",
 
-			Event: e.SORT_TYPE,
+			Event: pubsub.SORT_TYPE,
 		},
 		{
 			Label: "Sort by size (ascending)",
 
-			Event: e.SORT_SIZE_ASC,
+			Event: pubsub.SORT_SIZE_ASC,
 		},
 		{
 			Label: "Sort by size (descending)",
 
-			Event: e.SORT_SIZE_DESC,
+			Event: pubsub.SORT_SIZE_DESC,
 		},
 	}
 
 	c := NewMenuController(options, Dimensions{Width: 40, Height: 7})
 
-	c.On(e.ENTER, func() {
+	c.On(pubsub.ENTER, func() {
 		opt := c.Options[c.Index()]
 
 		switch true {

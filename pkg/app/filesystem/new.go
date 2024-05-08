@@ -3,18 +3,18 @@ package filesystem
 import (
 	"sync"
 
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub/event"
+	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 )
 
 var (
 	once sync.Once
-	n    *event.Node
+	n    *pubsub.Node
 	c    *FsController
 )
 
-func New(root string) *event.Node {
+func New(root string) *pubsub.Node {
 	once.Do(func() {
-		n = event.NewNode()
+		n = pubsub.NewNode()
 
 		NewFsController(n)
 	})
