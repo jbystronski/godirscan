@@ -1,2 +1,2 @@
-pkg/lib/termui
-pkg/lib/pubsub
+/pkg/lib/termui
+/pkg/lib/pubsub
