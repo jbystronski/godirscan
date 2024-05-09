@@ -7,7 +7,8 @@ import (
 	"time"
 
 	"github.com/jbystronski/godirscan/pkg/global"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
+	"github.com/jbystronski/godirscan/pkg/global/event"
+	"github.com/jbystronski/pubsub"
 )
 
 // var (
@@ -24,7 +25,7 @@ type ResizeListener struct {
 
 func NewResizeListener() *pubsub.Node {
 	// once.Do(func() {
-	n := pubsub.NewNode()
+	n := pubsub.NewNode(pubsub.GlobalBroker())
 
 	r := &ResizeListener{n, make(chan os.Signal, 1), false}
 
@@ -50,7 +51,7 @@ func (r *ResizeListener) Init() {
 					r.lock = true
 					global.ClearScreen()
 					time.Sleep(time.Millisecond * 500)
-					r.Passthrough(pubsub.RESIZE, r.Next)
+					r.Passthrough(event.RESIZE, r.Next())
 
 					r.lock = false
 

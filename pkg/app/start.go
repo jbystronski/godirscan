@@ -7,7 +7,8 @@ import (
 	"github.com/jbystronski/godirscan/pkg/app/config"
 	"github.com/jbystronski/godirscan/pkg/app/filesystem"
 	"github.com/jbystronski/godirscan/pkg/app/menu"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
+	"github.com/jbystronski/godirscan/pkg/global/event"
+	"github.com/jbystronski/pubsub"
 
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
 )
@@ -19,23 +20,23 @@ var (
 
 func NewStart() *pubsub.Node {
 	startOnce.Do(func() {
-		n := pubsub.NewNode()
+		n := pubsub.NewNode(pubsub.GlobalBroker())
 
-		n.On(pubsub.RENDER, printStartScreen)
+		n.On(event.RENDER, printStartScreen)
 
-		n.On(pubsub.S, func() {
+		n.On(event.S, func() {
 			printStartPrompt(n)
 		})
 
-		n.OnGlobal(pubsub.T, printStartScreen)
+		n.OnGlobal(event.T, printStartScreen)
 
-		n.OnGlobal(pubsub.RESIZE, printStartScreen)
+		n.OnGlobal(event.RESIZE, printStartScreen)
 
-		n.On(pubsub.ESC, func() {
+		n.On(event.ESC, func() {
 			m := menu.QuitMenu()
-			m.Watch()
+			// m.Watch()
 			n.LinkTo(m.Node)
-			n.Passthrough(pubsub.RENDER, n.Next)
+			n.Passthrough(event.RENDER, n.Next())
 		})
 
 		startNode = n
@@ -80,7 +81,7 @@ func printStartPrompt(n *pubsub.Node) {
 	root := cmd.WaitInput()
 
 	if root == "" {
-		n.Passthrough(pubsub.RENDER, n)
+		n.Passthrough(event.RENDER, n)
 	} else {
 
 		if _, err := os.Stat(root); err != nil {
@@ -90,9 +91,9 @@ func printStartPrompt(n *pubsub.Node) {
 
 		fs := filesystem.New(root)
 
-		fs.Watch()
-		n.Prev.LinkTo(fs)
-		n.Prev.Passthrough(pubsub.INIT, n.Prev.Next)
+		// fs.Watch()
+		n.Prev().LinkTo(fs)
+		n.Prev().Passthrough(event.INIT, n.Prev().Next())
 
 	}
 }

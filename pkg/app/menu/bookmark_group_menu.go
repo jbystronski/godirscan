@@ -2,9 +2,10 @@ package menu
 
 import (
 	"github.com/jbystronski/godirscan/pkg/app/config"
+	"github.com/jbystronski/godirscan/pkg/global/event"
 
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
+	"github.com/jbystronski/pubsub"
 )
 
 func BookmarkGroupMenu(groupName string) *MenuController {
@@ -12,72 +13,72 @@ func BookmarkGroupMenu(groupName string) *MenuController {
 		{
 			Label: "Main menu",
 
-			Event: pubsub.M,
+			Event: event.M,
 		},
 		{
 			Label: "All groups",
 
-			Event: pubsub.BOOKMARK_GROUP_LIST,
+			Event: event.BOOKMARK_GROUP_LIST,
 		},
 		{
 			Label:       "Delete group",
 			Description: groupName,
-			Event:       pubsub.BOOKMARK_REMOVE_GROUP,
+			Event:       event.BOOKMARK_REMOVE_GROUP,
 		},
 		{
 			Label:       "Add bookmark to",
 			Description: groupName,
-			Event:       pubsub.BOOKMARK,
+			Event:       event.BOOKMARK,
 		},
 	}
 	for _, bookmark := range config.Running().Bookmarks[groupName] {
 		opts = append(opts, MenuOption{
 			Label:       "Open",
 			Description: bookmark,
-			Event:       pubsub.BOOKMARK_OPEN,
+			Event:       event.BOOKMARK_OPEN,
 		})
 
 		opts = append(opts, MenuOption{
 			Label:       "Delete",
 			Description: bookmark,
-			Event:       pubsub.BOOKMARK_REMOVE,
+			Event:       event.BOOKMARK_REMOVE,
 		})
 
 	}
 
 	c := NewMenuController(opts, Dimensions{Height: 15, Width: termui.NewTerminal().Cols() / 3})
 
-	c.On(pubsub.ARROW_LEFT, func() {
+	c.On(event.ARROW_LEFT, func() {
 		c.Unlink()
-		c.Passthrough(pubsub.RENDER, c.Prev)
-		c.Passthrough(pubsub.BOOKMARK_GROUP_LIST, c.Prev)
+		c.Passthrough(event.RENDER, c.Prev())
+		c.Passthrough(event.BOOKMARK_GROUP_LIST, c.Prev())
 	})
 
-	c.On(pubsub.ENTER, func() {
+	c.On(event.ENTER, func() {
 		opt := c.Options[c.Index()]
 
 		switch true {
 
 		case true:
-			if opt.Event == pubsub.BOOKMARK {
+			if opt.Event == event.BOOKMARK {
 				c.Publish("bookmark_group", pubsub.Message(groupName))
 			}
 			fallthrough
 		case true:
 
-			if opt.Event == pubsub.BOOKMARK_OPEN {
+			if opt.Event == event.BOOKMARK_OPEN {
 				c.Publish("bookmark", pubsub.Message(opt.Description))
 			}
 			fallthrough
 		case true:
-			if opt.Event == pubsub.BOOKMARK_REMOVE {
+			if opt.Event == event.BOOKMARK_REMOVE {
 				c.Publish("bookmark_group", pubsub.Message(groupName))
 				c.Publish("bookmark", pubsub.Message(opt.Description))
 			}
 			fallthrough
 
 		case true:
-			if opt.Event == pubsub.BOOKMARK_REMOVE_GROUP {
+			if opt.Event == event.BOOKMARK_REMOVE_GROUP {
 				c.Publish("bookmark_group", pubsub.Message(groupName))
 			}
 			fallthrough

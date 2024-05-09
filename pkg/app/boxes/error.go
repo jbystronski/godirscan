@@ -3,7 +3,8 @@ package boxes
 import (
 	"time"
 
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
+	"github.com/jbystronski/godirscan/pkg/global/event"
+	"github.com/jbystronski/pubsub"
 
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
 )
@@ -16,7 +17,7 @@ type ErrorController struct {
 }
 
 func NewError(err string) *pubsub.Node {
-	n := pubsub.NewNode()
+	n := pubsub.NewNode(pubsub.GlobalBroker())
 
 	c := ErrorController{
 		n,
@@ -27,20 +28,20 @@ func NewError(err string) *pubsub.Node {
 	}
 	c.view.SetBorder().SetPadding(1, 2, 1, 2).SetHeight(8).SetWidth(cols() / 3).CenterHorizontally().CenterVertically()
 
-	n.OnGlobal(pubsub.RESIZE, func() {
+	n.OnGlobal(event.RESIZE, func() {
 		c.view.CenterVertically().CenterHorizontally()
 
 		c.Print()
 	})
 
-	n.OnGlobal(pubsub.T, c.Print)
+	n.OnGlobal(event.T, c.Print)
 
-	n.On(pubsub.Q, func() {
+	n.On(event.Q, func() {
 		n.Unlink()
-		n.Passthrough(pubsub.RENDER, n.First())
+		n.Passthrough(event.RENDER, n.First())
 	})
 
-	n.On(pubsub.RENDER, c.Print)
+	n.On(event.RENDER, c.Print)
 
 	return n
 }

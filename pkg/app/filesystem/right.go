@@ -16,7 +16,7 @@ func (c *FsController) right() {
 	if en.FsType() == data.DirDatatype {
 		c.backtrace.Set(c.root, c.Index())
 		c.Navigator.Reset()
-		// c.ui.Main.Print()
+
 		c.setStore(en.FullPath())
 	}
 }

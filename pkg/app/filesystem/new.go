@@ -3,7 +3,7 @@ package filesystem
 import (
 	"sync"
 
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
+	"github.com/jbystronski/pubsub"
 )
 
 var (
@@ -14,7 +14,7 @@ var (
 
 func New(root string) *pubsub.Node {
 	once.Do(func() {
-		n = pubsub.NewNode()
+		n = pubsub.NewNode(pubsub.GlobalBroker())
 
 		NewFsController(n)
 	})

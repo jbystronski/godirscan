@@ -32,7 +32,7 @@ func (c *FsController) left() {
 			c.SetIndex(index)
 		}
 		c.backtrace.Unset(dir)
-		// c.ui.Main.Print()
+
 		c.setStore(dir)
 
 	}

@@ -16,8 +16,8 @@ import (
 	"github.com/jbystronski/godirscan/pkg/app/data"
 	"github.com/jbystronski/godirscan/pkg/global"
 	g "github.com/jbystronski/godirscan/pkg/global"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
+	"github.com/jbystronski/pubsub"
 )
 
 var (

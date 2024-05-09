@@ -6,17 +6,18 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
+	"github.com/jbystronski/godirscan/pkg/global/event"
+	"github.com/jbystronski/pubsub"
 )
 
 func NewCommandOutput() *pubsub.Node {
-	n := pubsub.NewNode()
+	n := pubsub.NewNode(pubsub.GlobalBroker())
 
 	n.Subscribe("command_args", func(m pubsub.Message) {
 		n.EnqueueMessage("command_args", m)
 	})
 
-	n.On(pubsub.RENDER, func() {
+	n.On(event.RENDER, func() {
 		cls()
 
 		command_args := n.DequeueMessage("command_args")
@@ -24,7 +25,7 @@ func NewCommandOutput() *pubsub.Node {
 
 		args := strings.Fields(string(command_args))
 		if len(args) == 0 {
-			n.Passthrough(pubsub.Q, n)
+			n.Passthrough(event.Q, n)
 		}
 
 		args = append(args, string(command_path))
@@ -43,11 +44,10 @@ func NewCommandOutput() *pubsub.Node {
 		}
 	})
 
-	n.On(pubsub.Q, func() {
+	n.On(event.Q, func() {
 		cls()
 		n.Unlink()
-		n.Passthrough(pubsub.RENDER, n.Prev)
-		// n.Prev.RunEventCallback(pubsub.UNLINK_NEXT)
+		n.Passthrough(event.RENDER, n.Prev())
 	})
 
 	return n

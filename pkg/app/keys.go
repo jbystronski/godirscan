@@ -5,7 +5,8 @@ import (
 
 	"github.com/eiannone/keyboard"
 
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
+	"github.com/jbystronski/godirscan/pkg/global/event"
+	"github.com/jbystronski/pubsub"
 
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
 )
@@ -24,47 +25,49 @@ type Keys struct {
 
 func NewKeyboard() *pubsub.Node {
 	keyboardInit.Do(func() {
-		n = pubsub.NewNode()
+		n = pubsub.NewNode(pubsub.GlobalBroker())
 
 		k = &Keys{
 			n,
 			map[keyboard.Key]pubsub.Event{
-				keyboard.KeyArrowDown:  pubsub.ARROW_DOWN,
-				keyboard.KeyArrowLeft:  pubsub.ARROW_LEFT,
-				keyboard.KeyArrowUp:    pubsub.ARROW_UP,
-				keyboard.KeyArrowRight: pubsub.ARROW_RIGHT,
-				keyboard.KeyEsc:        pubsub.ESC,
-				keyboard.KeyTab:        pubsub.TAB,
-				keyboard.KeyInsert:     pubsub.INSERT,
-				keyboard.KeyCtrlA:      pubsub.CTRL_A,
-				keyboard.KeyCtrlB:      pubsub.CTRL_B,
-				keyboard.KeyCtrlF:      pubsub.CTRL_F,
-				keyboard.KeyCtrlR:      pubsub.CTRL_R,
-				keyboard.KeyCtrlS:      pubsub.CTRL_S,
-				keyboard.KeyCtrlV:      pubsub.CTRL_V,
-				keyboard.KeyF7:         pubsub.F7,
-				keyboard.KeyF6:         pubsub.F6,
-				keyboard.KeyDelete:     pubsub.DELETE,
-				keyboard.KeyCtrlK:      pubsub.CTRL_K,
-				keyboard.KeyHome:       pubsub.HOME,
-				keyboard.KeyEnd:        pubsub.END,
-				keyboard.KeyPgdn:       pubsub.PG_DOWN,
-				keyboard.KeyPgup:       pubsub.PG_UP,
-				keyboard.KeyEnter:      pubsub.ENTER,
+				keyboard.KeyArrowDown:  event.ARROW_DOWN,
+				keyboard.KeyArrowLeft:  event.ARROW_LEFT,
+				keyboard.KeyArrowUp:    event.ARROW_UP,
+				keyboard.KeyArrowRight: event.ARROW_RIGHT,
+				keyboard.KeyEsc:        event.ESC,
+				keyboard.KeyTab:        event.TAB,
+				keyboard.KeyInsert:     event.INSERT,
+				keyboard.KeyCtrlA:      event.CTRL_A,
+				keyboard.KeyCtrlB:      event.CTRL_B,
+				keyboard.KeyCtrlF:      event.CTRL_F,
+				keyboard.KeyCtrlR:      event.CTRL_R,
+				keyboard.KeyCtrlS:      event.CTRL_S,
+				keyboard.KeyCtrlV:      event.CTRL_V,
+				keyboard.KeyCtrlN:      event.CTRL_N,
+				keyboard.KeyF7:         event.F7,
+				keyboard.KeyF6:         event.F6,
+				keyboard.KeyDelete:     event.DELETE,
+				keyboard.KeyCtrlK:      event.CTRL_K,
+				keyboard.KeyHome:       event.HOME,
+				keyboard.KeyEnd:        event.END,
+				keyboard.KeyPgdn:       event.PG_DOWN,
+				keyboard.KeyPgup:       event.PG_UP,
+				keyboard.KeyEnter:      event.ENTER,
 			},
 			map[rune]pubsub.Event{
-				'h': pubsub.H,
-				'q': pubsub.Q,
-				'l': pubsub.L,
-				'i': pubsub.I,
-				'm': pubsub.M,
-				's': pubsub.S,
-				't': pubsub.T,
-				'd': pubsub.D,
-				'f': pubsub.F,
-				'e': pubsub.E,
-				'c': pubsub.C,
-				'g': pubsub.G,
+				'h': event.H,
+				'q': event.Q,
+				'l': event.L,
+				'i': event.I,
+				'm': event.M,
+				's': event.S,
+				't': event.T,
+				'd': event.D,
+				'f': event.F,
+				'e': event.E,
+				'c': event.C,
+				'g': event.G,
+				'r': event.R,
 			},
 		}
 
@@ -103,12 +106,12 @@ func (keys *Keys) Init() {
 
 				case ev.Rune != 0:
 					if str, ok := keys.runeMap[ev.Rune]; ok {
-						keys.Passthrough(str, keys.Next)
+						keys.Passthrough(str, keys.Next())
 					}
 
 				case ev.Key != 0:
 					if str, ok := keys.keysMap[ev.Key]; ok {
-						keys.Passthrough(str, keys.Next)
+						keys.Passthrough(str, keys.Next())
 					}
 				}
 			}

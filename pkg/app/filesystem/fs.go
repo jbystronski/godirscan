@@ -9,10 +9,11 @@ import (
 	"github.com/jbystronski/godirscan/pkg/app/data"
 	"github.com/jbystronski/godirscan/pkg/app/menu"
 	"github.com/jbystronski/godirscan/pkg/global"
+	"github.com/jbystronski/godirscan/pkg/global/event"
 
 	"github.com/jbystronski/godirscan/pkg/lib/maps"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
+	"github.com/jbystronski/pubsub"
 )
 
 type FsController struct {
@@ -85,7 +86,7 @@ func NewFsController(n *pubsub.Node) *FsController {
 	c.alt.MinOffset = c.alt.panel.OutputFirstLine()
 	c.alt.MaxOffset = c.alt.panel.OutputLastLine() - 1
 
-	c.On(pubsub.INIT, func() {
+	c.On(event.INIT, func() {
 		if c.root == "" {
 			c.sendError(errors.New("empty root path"))
 		}
@@ -138,7 +139,7 @@ func registerEvents(c *FsController) {
 	// 	}
 	// })
 
-	c.On(pubsub.TAB, func() {
+	c.On(event.TAB, func() {
 		main := c
 		alt := c.alt
 		c = alt
@@ -178,7 +179,7 @@ func registerEvents(c *FsController) {
 		c.EnqueueMessage("bookmark_group", m)
 	})
 
-	c.On(pubsub.RENDER, func() {
+	c.On(event.RENDER, func() {
 		cls()
 		hideCursor()
 		c.UpdateSize()
@@ -191,7 +192,7 @@ func registerEvents(c *FsController) {
 		// c.alt.restoreScreen()
 	})
 
-	c.On(pubsub.CTRL_V, func() {
+	c.On(event.CTRL_V, func() {
 		answ := c.getInput("Copy selected into the current directory? :", "y")
 
 		if answ != "y" || c.selected.Len() == 0 {
@@ -203,7 +204,7 @@ func registerEvents(c *FsController) {
 		}
 	})
 
-	c.On(pubsub.F6, func() {
+	c.On(event.F6, func() {
 		answ := c.getInput("Move selected into the current directory? :", "y")
 
 		if answ != "y" || c.selected.Len() == 0 {
@@ -215,123 +216,145 @@ func registerEvents(c *FsController) {
 		}
 	})
 
-	c.On(pubsub.BOOKMARK_GROUP_LIST, func() {
+	c.On(event.BOOKMARK_GROUP_LIST, func() {
 		c.OpenMenu(menu.BookmarkGroupListMenu())
 	})
 
-	c.On(pubsub.BOOKMARK_ADD_GROUP, func() {
+	c.On(event.BOOKMARK_ADD_GROUP, func() {
 		c.addBookmarkGroup()
 
 		c.OpenMenu(menu.BookmarkGroupListMenu())
 	})
 
-	c.On(pubsub.BOOKMARK_REMOVE_GROUP, func() {
+	c.On(event.BOOKMARK_REMOVE_GROUP, func() {
 		c.removeBookmarkGroup(string(c.DequeueMessage("bookmark_group")))
 
 		c.OpenMenu(menu.BookmarkGroupListMenu())
 	})
 
-	c.On(pubsub.REMOVE_BOOKMARK, func() {
+	c.On(event.REMOVE_BOOKMARK, func() {
 		bGroup := string(c.DequeueMessage("bookmark_group"))
 		bName := string(c.DequeueMessage("remove_bookmark"))
 
 		c.removeBookmark(bGroup, bName)
 	})
 
-	c.On(pubsub.BOOKMARK_OPEN, func() {
+	c.On(event.BOOKMARK_OPEN, func() {
 		c.openBookmark(string(c.DequeueMessage("bookmark")))
 	})
 
-	c.On(pubsub.BOOKMARK, func() {
+	c.On(event.BOOKMARK, func() {
 		group := c.DequeueMessage("bookmark_group")
 
 		c.bookmark(string(group))
 	})
 
-	c.On(pubsub.BOOKMARK_GROUP, func() {
+	c.On(event.BOOKMARK_GROUP, func() {
 		if c.HasNext() {
-			c.Next.Unlink()
+			c.Next().Unlink()
 		}
 
 		m := menu.BookmarkGroupMenu(string(c.DequeueMessage("bookmark_group")))
 
-		m.Watch()
+		// m.Watch()
 		c.LinkTo(m.Node)
-		c.Passthrough(pubsub.RENDER, c.Next)
+		c.Passthrough(event.RENDER, c.Next())
 	})
 
-	c.On(pubsub.END, func() {
+	c.On(event.END, func() {
 		if c.LastEntry() {
 			c.render()
 		}
 	})
 
-	c.On(pubsub.HOME, func() {
+	c.On(event.HOME, func() {
 		if c.FirstEntry() {
 			c.render()
 		}
 	})
 
-	c.On(pubsub.PG_UP, func() {
+	c.On(event.PG_UP, func() {
 		if c.data.Len() > 0 && c.MovePgUp() {
 			c.render()
 		}
 	})
 
-	c.On(pubsub.PG_DOWN, func() {
+	c.On(event.PG_DOWN, func() {
 		if c.MovePgDown(c.contentLines()) {
 			c.render()
 		}
 	})
 
-	c.On(pubsub.INSERT, func() {
+	c.On(event.INSERT, func() {
 		c.selectEntry()
 	})
 
-	c.On(pubsub.ARROW_DOWN, func() {
+	c.On(event.ARROW_DOWN, func() {
 		if c.NextEntry() {
 			c.render()
 		}
 	})
 
-	c.On(pubsub.ARROW_UP, func() {
+	c.On(event.ARROW_UP, func() {
 		if c.PrevEntry() {
 			c.render()
 		}
 	})
 
-	c.On(pubsub.SORT_NAME, func() {
+	c.On(event.SORT_NAME, func() {
 		c.sortByName()
 	})
 
-	c.On(pubsub.SORT_TYPE, func() {
+	c.On(event.SORT_TYPE, func() {
 		c.sortByType()
 	})
 
-	c.On(pubsub.SORT_SIZE_ASC, func() {
+	c.On(event.SORT_SIZE_ASC, func() {
 		c.sortBySizeAsc()
 	})
 
-	c.On(pubsub.SORT_SIZE_DESC, func() {
+	c.On(event.SORT_SIZE_DESC, func() {
 		c.sortBySizeDesc()
 	})
 
-	c.On(pubsub.SETTINGS, func() {
+	c.On(event.SETTINGS, func() {
 		c.executeCmd(config.Running().DefaultEditor, config.Running().GetSettingsFilepath())
 	})
 
-	c.On(pubsub.ARROW_RIGHT, func() {
+	c.On(event.ARROW_RIGHT, func() {
 		c.right()
 	})
 
-	c.On(pubsub.ARROW_LEFT, func() {
+	c.On(event.ARROW_LEFT, func() {
 		c.left()
 	})
 
-	c.On(pubsub.ENTER, func() {
+	c.On(event.ENTER, func() {
 		c.execute()
 	})
-	c.On(pubsub.C, func() {
+
+	c.On(event.R, func() {
+		c.setStore(c.root)
+	})
+
+	c.On(event.F, func() {
+		answ := c.getInput("Search", "")
+
+		if answ == "" {
+			return
+		}
+
+		if c.filter(answ) {
+
+			c.Navigator.Reset()
+			c.sort()
+			c.Navigator.TotalEntries = c.data.Len()
+			c.fullRender()
+
+		}
+	})
+
+	c.On(event.C, func() {
 		args := c.getInput("Execute command", "")
 
 		if args == "" {
@@ -343,11 +366,11 @@ func registerEvents(c *FsController) {
 		c.executeCmd(args, path)
 	})
 
-	c.On(pubsub.CTRL_F, func() {
+	c.On(event.CTRL_F, func() {
 		c.search()
 	})
 
-	c.On(pubsub.DELETE, func() {
+	c.On(event.DELETE, func() {
 		answ := c.getInput("Delete selected entries", "y")
 
 		if answ != "y" || c.selected.Len() == 0 {
@@ -368,43 +391,39 @@ func registerEvents(c *FsController) {
 		}
 	})
 
-	c.On(pubsub.E, func() {
+	c.On(event.E, func() {
 		c.edit()
 	})
 
-	c.On(pubsub.F, func() {
+	c.On(event.CTRL_N, func() {
 		c.newFile()
 	})
 
-	c.On(pubsub.G, func() {
-		c.goTo()
-	})
-
-	c.On(pubsub.D, func() {
+	c.On(event.D, func() {
 		c.newDirectory()
 	})
 
-	c.On(pubsub.CTRL_R, func() {
+	c.On(event.CTRL_R, func() {
 		c.rename()
 	})
 
-	c.On(pubsub.CTRL_A, func() {
+	c.On(event.CTRL_A, func() {
 		c.selectAll()
 	})
 
-	c.On(pubsub.SORT_MENU, func() {
+	c.On(event.SORT_MENU, func() {
 		c.OpenMenu(menu.SortMenu())
 	})
 
-	c.On(pubsub.ESC, func() {
+	c.On(event.ESC, func() {
 		c.OpenMenu(menu.QuitMenu())
 	})
 
-	c.On(pubsub.M, func() {
+	c.On(event.M, func() {
 		c.OpenMenu(menu.MainMenu())
 	})
 
-	c.On(pubsub.I, func() {
+	c.On(event.I, func() {
 		if c.data.Len() == 0 {
 			return
 		}
@@ -421,40 +440,40 @@ func registerEvents(c *FsController) {
 		}
 
 		if c.HasNext() {
-			c.Next.Unlink()
+			c.Next().Unlink()
 		}
 
 		info := boxes.NewFileInfo(file, entry.Size())
 
-		info.Watch()
+		// info.Watch()
 		c.LinkTo(info)
-		c.Passthrough(pubsub.RENDER, c.Next)
+		c.Passthrough(event.RENDER, c.Next())
 	})
 
-	c.On(pubsub.QUIT_APP, func() {
-		c.Passthrough(pubsub.QUIT_APP, c.First())
+	c.On(event.QUIT_APP, func() {
+		c.Passthrough(event.QUIT_APP, c.First())
 	})
 
-	// c.On(pubsub.Q, func() {
+	// c.On(event.Q, func() {
 	// 	if c.HasNext() {
 	// 		c.Next.Unlink()
-	// 		c.Passthrough(pubsub.RENDER, c.Node)
+	// 		c.Passthrough(event.RENDER, c.Node)
 	// 		// cls()
 	// 		// c.restorePanels()
 	// 	}
 	// })
 
-	c.On(pubsub.S, func() {
+	c.On(event.S, func() {
 		c.scanDir(config.Running().DefaultRootDirectory)
 	})
 
-	c.OnGlobal(pubsub.T, func() {
+	c.OnGlobal(event.T, func() {
 		cls()
 		c.fullRender()
 		c.alt.fullRender()
 	})
 
-	c.OnGlobal(pubsub.RESIZE, func() {
+	c.OnGlobal(event.RESIZE, func() {
 		//	cls()
 		//	timpubsub.Sleep(timpubsub.Millisecond * 100)
 
@@ -471,10 +490,10 @@ func registerEvents(c *FsController) {
 
 func (c *FsController) OpenMenu(m *menu.MenuController) {
 	if c.HasNext() {
-		c.Next.Unlink()
+		c.Next().Unlink()
 	}
 
-	m.Watch()
+	// m.Watch()
 	c.LinkTo(m.Node)
-	c.Passthrough(pubsub.RENDER, c.Next)
+	c.Passthrough(event.RENDER, c.Next())
 }

@@ -2,8 +2,9 @@ package menu
 
 import (
 	"github.com/jbystronski/godirscan/pkg/app/config"
+	"github.com/jbystronski/godirscan/pkg/global/event"
 
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
+	"github.com/jbystronski/pubsub"
 
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
 )
@@ -13,12 +14,12 @@ func BookmarkGroupListMenu() *MenuController {
 		{
 			Label: "Main menu",
 
-			Event: pubsub.M,
+			Event: event.M,
 		},
 		{
 			Label: "Add bookmark group",
 
-			Event: pubsub.BOOKMARK_ADD_GROUP,
+			Event: event.BOOKMARK_ADD_GROUP,
 		},
 	}
 	for groupName := range config.Running().Bookmarks {
@@ -26,19 +27,19 @@ func BookmarkGroupListMenu() *MenuController {
 			Label:       "Group",
 			Description: groupName,
 
-			Event: pubsub.BOOKMARK_GROUP,
+			Event: event.BOOKMARK_GROUP,
 		})
 	}
 
 	c := NewMenuController(opts, Dimensions{Height: 15, Width: termui.NewTerminal().Cols() / 3})
 
-	c.On(pubsub.ENTER, func() {
+	c.On(event.ENTER, func() {
 		opt := c.Options[c.Index()]
 
 		switch true {
 
 		case true:
-			if opt.Event == pubsub.BOOKMARK_GROUP {
+			if opt.Event == event.BOOKMARK_GROUP {
 				c.Publish("bookmark_group", pubsub.Message(opt.Description))
 			}
 			fallthrough

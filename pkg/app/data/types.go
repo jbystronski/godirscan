@@ -12,4 +12,5 @@ type Accessor interface {
 	FindByPath(string) (*FsEntry, bool)
 	Reset()
 	Size() int
+	SetData([]*FsEntry)
 }

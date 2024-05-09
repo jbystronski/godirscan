@@ -6,7 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
+	"github.com/jbystronski/godirscan/pkg/global/event"
+	"github.com/jbystronski/pubsub"
 
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
 )
@@ -20,7 +21,7 @@ type ProgressController struct {
 }
 
 func NewProgressBox(cancelCtx context.CancelFunc) *pubsub.Node {
-	n := pubsub.NewNode()
+	n := pubsub.NewNode(pubsub.GlobalBroker())
 
 	c := ProgressController{
 		n,
@@ -36,11 +37,11 @@ func NewProgressBox(cancelCtx context.CancelFunc) *pubsub.Node {
 	c.view.SetLeft(1)
 	// c.view.SetBorder().SetPadding(2, 2, 2, 2).SetHeight(6).SetWidth(cols() / 2).CenterVertically().CenterHorizontally()
 
-	n.On(pubsub.ESC, func() {
+	n.On(event.ESC, func() {
 		cancelCtx()
 	})
 
-	n.On(pubsub.RENDER, func() {
+	n.On(event.RENDER, func() {
 		// c.currentMsg = string(c.DequeueMessage("process_message"))
 
 		c.render()

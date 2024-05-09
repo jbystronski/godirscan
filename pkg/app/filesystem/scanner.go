@@ -10,8 +10,9 @@ import (
 	"github.com/jbystronski/godirscan/pkg/app/boxes"
 	"github.com/jbystronski/godirscan/pkg/app/data"
 	"github.com/jbystronski/godirscan/pkg/global"
+	"github.com/jbystronski/godirscan/pkg/global/event"
 
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
+	"github.com/jbystronski/pubsub"
 )
 
 func (c *FsController) scanDir(defaultDir string) {
@@ -118,9 +119,9 @@ func (c *FsController) calculateStoreSize() {
 		ctx := global.NewCancelContext()
 
 		progress := boxes.NewProgressBox(ctx.CancelFunc)
-		progress.Watch()
+		// progress.Watch()
 		c.LinkTo(progress)
-		c.Passthrough(pubsub.RENDER, c.Next)
+		c.Passthrough(event.RENDER, c.Next())
 
 		for _, e := range c.data.All() {
 			switch e.FsType() {
@@ -149,7 +150,7 @@ func (c *FsController) calculateStoreSize() {
 		wg.Done()
 	}()
 	wg.Wait()
-	c.Next.Unlink()
+	c.Next().Unlink()
 }
 
 func (c *FsController) scanSize(path string, ctx *global.CancelContext) (total int) {

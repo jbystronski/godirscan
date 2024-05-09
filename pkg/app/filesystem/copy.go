@@ -9,7 +9,8 @@ import (
 
 	"github.com/jbystronski/godirscan/pkg/app/boxes"
 	"github.com/jbystronski/godirscan/pkg/global"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
+	"github.com/jbystronski/godirscan/pkg/global/event"
+	"github.com/jbystronski/pubsub"
 )
 
 func (c *FsController) Copy(deleteAfter bool) error {
@@ -17,7 +18,7 @@ func (c *FsController) Copy(deleteAfter bool) error {
 	currentPath := c.root
 
 	if c.HasNext() {
-		c.Next.Unlink()
+		c.Next().Unlink()
 	}
 
 	sem := make(chan struct{}, 40)
@@ -30,9 +31,8 @@ func (c *FsController) Copy(deleteAfter bool) error {
 
 	progress := boxes.NewProgressBox(c.ctx.CancelFunc)
 
-	progress.Watch()
 	c.LinkTo(progress)
-	c.Passthrough(pubsub.RENDER, c.Next)
+	c.Passthrough(event.RENDER, c.Next())
 
 	for source := range entries {
 
@@ -81,7 +81,7 @@ func (c *FsController) Copy(deleteAfter bool) error {
 
 	}
 
-	c.Next = nil
+	c.Next().Unlink()
 
 	if c.root == currentPath {
 		c.setStore(currentPath)

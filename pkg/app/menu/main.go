@@ -5,7 +5,8 @@ import (
 	"time"
 
 	"github.com/jbystronski/godirscan/pkg/global"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
+	"github.com/jbystronski/godirscan/pkg/global/event"
+	"github.com/jbystronski/pubsub"
 
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
 )
@@ -21,7 +22,7 @@ type Dimensions struct {
 
 type MenuController struct {
 	*pubsub.Node
-	*pubsub.Broker
+
 	termui.Navigator
 	Options []MenuOption
 	View    termui.Section
@@ -33,8 +34,8 @@ type MenuController struct {
 
 func NewMenuController(options []MenuOption, dimensions Dimensions) *MenuController {
 	c := MenuController{
-		pubsub.NewNode(),
-		pubsub.SingleBroker(),
+		pubsub.NewNode(pubsub.GlobalBroker()),
+
 		termui.Navigator{},
 		options,
 		termui.NewSection(),
@@ -45,49 +46,48 @@ func NewMenuController(options []MenuOption, dimensions Dimensions) *MenuControl
 		0,
 	}
 
-	c.Node.On(pubsub.Q, func() {
-		//	termui.ClearScreen()
+	c.Node.On(event.Q, func() {
 		c.Node.Unlink()
-		c.Node.Passthrough(pubsub.RENDER, c.Node.Prev)
+		c.Node.Passthrough(event.RENDER, c.Node.Prev())
 	})
 
-	c.Node.On(pubsub.ARROW_DOWN, func() {
+	c.Node.On(event.ARROW_DOWN, func() {
 		if c.NextEntry() {
 			c.render()
 		}
 	})
 
-	c.Node.On(pubsub.ARROW_UP, func() {
+	c.Node.On(event.ARROW_UP, func() {
 		if c.PrevEntry() {
 			c.render()
 		}
 	})
 
-	c.Node.On(pubsub.PG_UP, func() {
+	c.Node.On(event.PG_UP, func() {
 		if len(c.Options) > 0 && c.MovePgUp() {
 			c.render()
 		}
 	})
 
-	c.Node.On(pubsub.PG_DOWN, func() {
+	c.Node.On(event.PG_DOWN, func() {
 		if c.MovePgDown(c.View.ContentLines()) {
 			c.render()
 		}
 	})
 
-	c.Node.On(pubsub.HOME, func() {
+	c.Node.On(event.HOME, func() {
 		if c.FirstEntry() {
 			c.render()
 		}
 	})
 
-	c.Node.On(pubsub.END, func() {
+	c.Node.On(event.END, func() {
 		if c.LastEntry() {
 			c.render()
 		}
 	})
 
-	c.Node.OnGlobal(pubsub.RESIZE, func() {
+	c.Node.OnGlobal(event.RESIZE, func() {
 		c.View.CenterVertically().CenterHorizontally()
 
 		c.Navigator.MinOffset = c.View.OutputFirstLine()
@@ -95,7 +95,7 @@ func NewMenuController(options []MenuOption, dimensions Dimensions) *MenuControl
 		c.print()
 	})
 
-	c.Node.OnGlobal(pubsub.T, func() {
+	c.Node.OnGlobal(event.T, func() {
 		time.Sleep(time.Millisecond * 100)
 
 		t := termui.NewTerminal()
@@ -104,7 +104,7 @@ func NewMenuController(options []MenuOption, dimensions Dimensions) *MenuControl
 		c.fullRender()
 	})
 
-	c.Node.On(pubsub.RENDER, c.print)
+	c.Node.On(event.RENDER, c.print)
 
 	c.View.SetBorder().SetPadding(1, 1, 1, 2).SetHeight(dimensions.Height).SetWidth(dimensions.Width).CenterVertically().CenterHorizontally()
 	c.Navigator.MinOffset = c.View.OutputFirstLine()
@@ -116,14 +116,14 @@ func NewMenuController(options []MenuOption, dimensions Dimensions) *MenuControl
 
 func (m *MenuController) RunDefault(e pubsub.Event) {
 	var target *pubsub.Node
-	if m.Prev.HasLocal(e) {
-		target = m.Prev
+	if m.Prev().HasLocal(e) {
+		target = m.Prev()
 	} else {
 		target = m.First()
 	}
 
 	m.Unlink()
-	m.Passthrough(pubsub.RENDER, target)
+	m.Passthrough(event.RENDER, target)
 	m.Passthrough(e, target)
 }
 

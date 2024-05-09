@@ -1,6 +1,6 @@
 package menu
 
-import "github.com/jbystronski/godirscan/pkg/lib/pubsub"
+import "github.com/jbystronski/pubsub"
 
 type MenuOption struct {
 	Label, Description string

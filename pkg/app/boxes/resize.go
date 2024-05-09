@@ -2,17 +2,11 @@ package boxes
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/jbystronski/godirscan/pkg/app/config"
-	"github.com/jbystronski/godirscan/pkg/lib/pubsub"
+	"github.com/jbystronski/godirscan/pkg/global/event"
 	"github.com/jbystronski/godirscan/pkg/lib/termui"
-)
-
-var (
-	initResizeWarning    sync.Once
-	resizeWarnNode       *pubsub.Node
-	resizeWarnController *ResizeWarnController
+	"github.com/jbystronski/pubsub"
 )
 
 type ResizeWarnController struct {
@@ -22,23 +16,21 @@ type ResizeWarnController struct {
 }
 
 func NewResizeWarning() *pubsub.Node {
-	initResizeWarning.Do(func() {
-		resizeWarnNode = pubsub.NewNode()
+	n := pubsub.NewNode(pubsub.GlobalBroker())
 
-		resizeWarnController = &ResizeWarnController{
-			resizeWarnNode,
-			termui.NewSection(),
-			termui.NewSection(),
-		}
+	c := &ResizeWarnController{
+		n,
+		termui.NewSection(),
+		termui.NewSection(),
+	}
 
-		resizeWarnNode.On(pubsub.RENDER, resizeWarnController.print)
+	n.On(event.RENDER, c.print)
 
-		resizeWarnNode.On(pubsub.ESC, func() {
-			resizeWarnNode.Passthrough(pubsub.QUIT_APP, resizeWarnNode.First())
-		})
+	n.On(event.ESC, func() {
+		n.Passthrough(event.QUIT_APP, n.First())
 	})
 
-	return resizeWarnNode
+	return n
 }
 
 func (c *ResizeWarnController) print() {

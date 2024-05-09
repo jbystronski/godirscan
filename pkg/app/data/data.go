@@ -30,6 +30,12 @@ func (e FsData) Size() int {
 	return size
 }
 
+func (e *FsData) SetData(data []*FsEntry) {
+	e.Reset()
+
+	e.data = data
+}
+
 func (e *FsData) Reset() {
 	e.data = []*FsEntry{}
 }
